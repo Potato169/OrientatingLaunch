@@ -1,36 +1,42 @@
-#include "iconv.h"
-#pragma comment(lib,"libiconv.lib")
 #include "In2FileReader.h"
 #include <iostream>
 #include <iomanip>
+#include "EdgeManager.h"
+#include "OrientatingLaunch.h"
+#include "AngleConverter.h"
 
 int main() {
 
     In2FileReader reader;
     reader.readIn2File("D:/data/sxbd.in2");
-    auto AccuracyValues = reader.getAccuracyValues();
-	auto KnownPoints = reader.getKnownPoints();
-	auto Observations = reader.getObservations();
 
-	std::cout << std::fixed << std::setprecision(6);
-	// 打印精度值
-	for (const auto& av : AccuracyValues) {
-		std::cout << "Direction Precision: " << av.directionPrecision << ", Distance Precision 1: " << av.distancePrecision1 << ", Distance Precision 2: " << av.distancePrecision2 << std::endl;
-	}
-	// 打印已知点
-	for (const auto& kp : KnownPoints) {
-		std::cout << "Known Point ID: " << kp.id << ", X: " << kp.x << ", Y: " << kp.y << std::endl;
-	}
-	// 打印观测数据
-	for (const auto& obs : Observations) {
-		std::cout << "Station ID: " << obs.stationId << std::endl;
-		for (const auto& observation : obs.observations) {
-			std::cout << "\tObservation Point ID: " << observation.pointId
-				<< ", Type: " << observation.type
-				<< ", Value: " << observation.value
-				<< ", Accuracy Number: " << observation.accuracyNumber
-				<< std::endl;
-		}
-	}
-	return 0;
+
+	std::cout << std::fixed << std::setprecision(8);
+
+    EdgeManager manager;
+
+    OrientatingLaunch launcher(manager, reader);
+    launcher.initializeEdges();
+    manager.printEdges();
+
+    launcher.performAdjustment();
+    launcher.printEdgeColumnMap();
+
+    manager.printEdges();
+
+    // // 获取结果
+    // auto results = launcher.getResults();
+    // for (const auto& res : results) {
+    //     qDebug() << res.FROM << res.TO << res.RESULT << res.M << res.V ;
+    // }`
+
+    auto V_results = launcher.getVResults();
+    for (const auto& res : V_results) {
+        std::cout << res.FROM << res.TO << res.VALUE << res.V << res.RESULT;
+        std::cout << res.FROM << res.TO << AngleConverter::parseAngleString(res.VALUE)
+            << AngleConverter::parseAngleString(res.V)
+            << AngleConverter::parseAngleString(res.RESULT);
+
+
+    }
 }

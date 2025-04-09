@@ -3,16 +3,25 @@
 
 
 
-    // DirectedEdge 成员函数实现
+// DirectedEdge 成员函数实现
 DirectedEdge::DirectedEdge(const std::string& f, const std::string& t,
     double az, bool isFixed)
-    : from(f), to(t), reverse_edge(nullptr), isFixed(isFixed) {
-    setAzimuthInternal(az, false);
+    : from(f), to(t), azimuth(az), reverse_edge(nullptr), isFixed(isFixed) {
+    /*setAzimuthInternal(az, false);*/
+    if (az < 0.0 || az >= 360.0) {
+        throw std::invalid_argument("Azimuth must be in [0, 360) degrees");
+    }
+    if (reverse_edge) {
+        reverse_edge->setAzimuthInternal(fmod(az + 180.0, 360.0), false);
+        reverse_edge->isFixed = isFixed;
+    }
 }
 
 void DirectedEdge::setAzimuth(double new_azimuth) {
     setAzimuthInternal(new_azimuth, true);
 }
+
+
 
 void DirectedEdge::setAzimuthInternal(double new_azimuth, bool propagate) {
     if (isFixed) {

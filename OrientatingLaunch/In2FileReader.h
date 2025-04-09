@@ -63,6 +63,8 @@ private:
     std::string convertEncoding(const char* from, const char* to, const std::string& input);
     bool isValidUTF8(const std::string& str) const;
     static std::vector<std::string> splitString(const std::string& str, char delimiter);
+    // ×Ö·û´®´¦Àí¸¨Öúº¯Êý
+    static std::string trim(const std::string& s);
 };
 
 #endif // IN2FILEREADER_H

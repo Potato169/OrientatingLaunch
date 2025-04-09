@@ -8,6 +8,13 @@ using namespace std;
 In2FileReader::In2FileReader() = default;
 In2FileReader::~In2FileReader() = default;
 
+// 辅助函数实现
+string In2FileReader::trim(const string& s) {
+    auto wsfront = find_if_not(s.begin(), s.end(), [](int c) {return isspace(c);});
+    auto wsback = find_if_not(s.rbegin(), s.rend(), [](int c) {return isspace(c);}).base();
+    return (wsback <= wsfront ? string() : string(wsfront, wsback));
+}
+
 bool In2FileReader::readIn2File(const std::string& filePath) {
     ifstream file(filePath, ios::binary);
     if (!file.is_open()) {
@@ -55,7 +62,7 @@ bool In2FileReader::readIn2File(const std::string& filePath) {
         if (line.empty()) continue;
 
         Ui::ObservationData obsData;
-        obsData.stationId = line;
+        obsData.stationId = trim(line);
 
         while (getline(iss, line) && line.find_first_not_of(" \t\r\n") != std::string::npos) {
             auto parts = splitString(line, ',');
