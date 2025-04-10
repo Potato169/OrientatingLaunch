@@ -216,6 +216,9 @@ void OrientatingLaunch::buildMatrices() {
     int n = edgeColumnMap.size();
     B = Eigen::MatrixXd::Zero(m, n);
     L = Eigen::VectorXd::Zero(m);
+    Eigen::VectorXd P(m);
+
+
 
     for (int i = 0; i < m; ++i) {
         string stationId = directionObservations[i].first;
@@ -358,9 +361,13 @@ DirectedEdge* OrientatingLaunch::findInitialEdge(const string& stationId) {
     return nullptr;
 }
 
+
+
+
+//平差的整体流程
 void OrientatingLaunch::performAdjustment() {
     try {
-        buildMatrices();        // 先构建B和L矩阵
+        buildMatrices();        // 先构建B、P和L矩阵
         calculateCorrections(); // 计算平差参数
         updateEdgeAzimuths();   // 更新边方位角
         // calculateObservationCorrections(); // 计算观测值改正
@@ -376,10 +383,12 @@ void OrientatingLaunch::calculateCorrections() {
     int n = B.cols();
     int m = B.rows();
 
+
     // 计算法方程矩阵 NBB = B^T * P * B (P暂时设为单位矩阵)
     NBB = B.transpose() * B;
 
     const Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "");
+    cout << "B:\n" << B.format(fmt) << endl;
     cout << "NBB:\n" << NBB.format(fmt) << endl;
 
     Eigen::MatrixXd NBB_inv = NBB.inverse();

@@ -68,11 +68,11 @@ bool In2FileReader::readIn2File(const std::string& filePath) {
             auto parts = splitString(line, ',');
             if (parts.size() >= 3) {
                 Ui::Observation obs;
-                obs.pointId = parts[0];
+                obs.pointId = trim(parts[0]);
                 if (parts[1] == "L") obs.type = "方向观测";
                 else if (parts[1] == "S") obs.type = "距离观测";
                 else if (parts[1] == "A") obs.type = "方位角";
-                obs.value = parts[2];
+                obs.value = trim(parts[2]);
                 obsData.observations.push_back(obs);
             }
         }

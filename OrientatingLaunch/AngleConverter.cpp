@@ -12,7 +12,8 @@ double AngleConverter::parseAngleString(const std::string& angleStr) {
     // 2. ·Ö¸î×Ö·û´®
     vector<string> parts = split(cleanStr, '.');
     if (parts.size() != 2 || parts[1].length() != 6) {
-        cerr << "Invalid format. Expected 6 decimal digits." << endl;
+        cerr << "Invalid format. Expected 6 decimal digits.\n"
+            << "This value could be 0.0 or some illegal value" << endl;
         return 0.0;
     }
 
