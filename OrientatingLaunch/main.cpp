@@ -8,7 +8,7 @@
 int main() {
 
     In2FileReader reader;
-    reader.readIn2File("D:/data/sxbd.in2");
+    reader.readIn2File("D:/data/sxbd_2.in2");
 
 
 	std::cout << std::fixed << std::setprecision(8);
@@ -18,7 +18,7 @@ int main() {
     OrientatingLaunch launcher(manager, reader);
     launcher.initializeEdges();
     manager.printEdges();
-
+	std::cout << "已知边的数量：" << manager.getFixedEdgeCount() << std::endl;
     launcher.performAdjustment();
     launcher.printEdgeColumnMap();
 

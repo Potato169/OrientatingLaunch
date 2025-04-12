@@ -13,7 +13,7 @@ DirectedEdge::DirectedEdge(const std::string& f, const std::string& t,
     }
     if (reverse_edge) {
         reverse_edge->setAzimuthInternal(fmod(az + 180.0, 360.0), false);
-        reverse_edge->isFixed = isFixed;
+        /*reverse_edge->isFixed = isFixed;*/
     }
 }
 
@@ -87,6 +87,11 @@ DirectedEdge* EdgeManager::addEdge(const std::string& from, const std::string& t
 
         edge_map.emplace(key, new_edge);
         edge_map.emplace(reverse_key, reverse_edge);
+
+        // 更新计数器
+        if (isFixed) {
+            fixed_edge_count++;
+        }
 
         std::cout << " Created edge " << from << "→" << to
             << " with azimuth " << std::fixed << std::setprecision(8) << azimuth << "°\n"

@@ -14,8 +14,7 @@
 #include <iomanip>
 #include <memory>
 
-    // 前置声明
-class EdgeManager;
+
 
 class DirectedEdge {
 public:
@@ -23,13 +22,14 @@ public:
     std::string to;
     double azimuth;
     DirectedEdge* reverse_edge;
-    bool isFixed;
+
 
     DirectedEdge(const std::string& f, const std::string& t, double az, bool isFixed = false);
     void setAzimuth(double new_azimuth);
     bool isAzimuthFixed() const { return isFixed; }
 
 private:
+    bool isFixed;
     void setAzimuthInternal(double new_azimuth, bool propagate);
     friend class EdgeManager;
 };
@@ -47,6 +47,9 @@ private:
 
     std::unordered_map<std::pair<std::string, std::string>, DirectedEdge*, PairHash> edge_map;
 
+    // 统计已知边数量的计数器
+    int fixed_edge_count = 0;
+
 public:
     using ConstIterator = decltype(edge_map)::const_iterator;
 
@@ -58,6 +61,9 @@ public:
     DirectedEdge* getEdge(const std::string& from, const std::string& to) const;
     void updateAzimuth(const std::string& from, const std::string& to, double delta);
     void printEdges() const;
+
+    // 查询已知边数量
+    int getFixedEdgeCount() const { return fixed_edge_count; }
 
     ConstIterator begin() const { return edge_map.begin(); }
     ConstIterator end() const { return edge_map.end(); }
