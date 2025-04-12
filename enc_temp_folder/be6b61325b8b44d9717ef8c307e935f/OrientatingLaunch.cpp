@@ -275,7 +275,7 @@ void OrientatingLaunch::processStationQueue(
                 //    edge->setAzimuth(azimuth);
                 //}
                 std::cout << "Warning: Edge " << stationId << "→" << toPoint
-                    << " already exists via reverse edge " << std::endl;
+                    << " already exists " << std::endl;
             }
 
         }
@@ -330,6 +330,9 @@ void OrientatingLaunch::buildEdgeColumnMapping() {
         string from = it->first.first;
         string to = it->first.second;
         pair<string, string> reversePair(to, from);
+
+        // 当边为固定边时不参与平差
+        if (it->second->isAzimuthFixed()) continue;
 
         if (processedEdges.find(reversePair) == processedEdges.end()) {
             ostringstream edgeIdStream;

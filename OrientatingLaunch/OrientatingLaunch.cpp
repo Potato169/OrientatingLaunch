@@ -331,6 +331,9 @@ void OrientatingLaunch::buildEdgeColumnMapping() {
         string to = it->first.second;
         pair<string, string> reversePair(to, from);
 
+        // 当边为固定边时不参与平差
+        if (it->second->isAzimuthFixed()) continue;
+
         if (processedEdges.find(reversePair) == processedEdges.end()) {
             ostringstream edgeIdStream;
             if (from < to) {

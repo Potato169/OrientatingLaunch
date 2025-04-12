@@ -133,12 +133,14 @@ void EdgeManager::printEdges() const {
 
         std::ostringstream oss1, oss2;
         oss1 << std::left << std::setw(6) << edge->from << "б·" << std::setw(6) << edge->to
-            << " (Azimuth: " << std::fixed << std::setprecision(8) << edge->azimuth << "бу)";
+            << " (Azimuth: " << std::fixed << std::setprecision(8) << edge->azimuth << "бу)"
+            << " isFixed: " << edge->isAzimuthFixed();
 
         oss2 << std::left << std::setw(6) << edge->reverse_edge->from << "б·"
             << std::setw(6) << edge->reverse_edge->to
             << " (Azimuth: " << std::fixed << std::setprecision(8)
-            << edge->reverse_edge->azimuth << "бу)";
+            << edge->reverse_edge->azimuth << "бу)"
+            << " isFixed: " << edge->isAzimuthFixed();
 
         std::cout << "Edge " << oss1.str() << " | Reverse Edge " << oss2.str() << "\n";
 
