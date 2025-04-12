@@ -161,42 +161,125 @@ void OrientatingLaunch::processStationQueue(
 
         if (validObs.empty()) continue;
 
-        double baseAzimuth = 0.0;
-        double ObsAzimuth = 0.0;
-        // 处理所有观测值
+        //double baseAzimuth = 0.0;
+        //double ObsAzimuth = 0.0;
+        //// 处理所有观测值
+        //for (const auto& obs : validObs) {
+        //    if (stod(obs.value) == 0.0) {  
+        //        //起始方向, 这里逻辑存在问题，如果
+        //        //起始方向未提前在edge_map中定义，那么将初始化失败
+        //        auto* edge = manager.getEdge(stationId, trim(obs.pointId));
+        //        if (edge) {
+        //            baseAzimuth = edge->azimuth;
+        //        }
+        //        else {
+        //            edge = manager.getEdge(trim(obs.pointId), stationId);
+        //            if (edge) {
+        //                baseAzimuth = fmod(edge->azimuth + 180.0, 360.0);
+        //            }
+        //            else {
+
+        //            }
+        //        }
+        //        // 创建新边
+        //        auto* newEdge = manager.addEdge(stationId, trim(obs.pointId), baseAzimuth);
+        //        if (newEdge) edgeQueue.push({ stationId, trim(obs.pointId) });
+
+        //    }
+        //    else { // 非起始方向
+        //        //这里显然使用的是未转化前的角度，这里用自己给的函数转换一下，注意不要todouble
+        //        // double delta = obs.value.toDouble();
+
+        //        double delta = AngleConverter::parseAngleString(obs.value);
+        //        ObsAzimuth = fmod(baseAzimuth + delta, 360.0);
+
+        //        // 创建新边
+        //        auto* newEdge = manager.addEdge(stationId, trim(obs.pointId), ObsAzimuth);
+        //        if (newEdge) edgeQueue.push({ stationId, trim(obs.pointId) });
+
+        //    }
+
+        //}
+
+        // 步骤1：查找存在的起始边
+        DirectedEdge* startEdge = nullptr;
+        double startObsValue = 0.0;
+        std::string startToPoint;
+
         for (const auto& obs : validObs) {
-            if (stod(obs.value) == 0.0) {  
-                //起始方向, 这里逻辑存在问题，如果
-                //起始方向未提前在edge_map中定义，那么将初始化失败
-                auto* edge = manager.getEdge(stationId, trim(obs.pointId));
-                if (edge) {
-                    baseAzimuth = edge->azimuth;
+            if (obs.type != "方向观测") continue; // 确保是方向观测
+            std::string to = obs.pointId;
+            DirectedEdge* edge = manager.getEdge(stationId, to);
+            if (edge) {
+                try {
+                    startObsValue = std::stod(obs.value);
                 }
-                else {
-                    edge = manager.getEdge(trim(obs.pointId), stationId);
-                    if (edge) {
-                        baseAzimuth = fmod(edge->azimuth + 180.0, 360.0);
-                    } 
+                catch (const std::exception& e) {
+                    throw std::runtime_error("无效的观测值: " + obs.value);
                 }
-                // 创建新边
-                auto* newEdge = manager.addEdge(stationId, trim(obs.pointId), baseAzimuth);
-                if (newEdge) edgeQueue.push({ stationId, trim(obs.pointId) });
+                startEdge = edge;
+                startToPoint = to;
+                break;
+            }
+        }
+
+        if (!startEdge) {
+            throw std::runtime_error("在validObs中未找到存在于EdgeManager的边");
+        }
+
+        // 步骤2：归化所有观测值
+        std::vector<std::pair<std::string, double>> normalizedObs;
+        for (const auto& obs : validObs) {
+            if (obs.type != "方向观测") continue;
+            double value;
+            try {
+                value = std::stod(obs.value);
+            }
+            catch (const std::exception& e) {
+                throw std::runtime_error("无效的观测值: " + obs.value);
+            }
+            // 计算相对于起始观测值的差值
+            double normalized = value - startObsValue;
+            // 调整到0-360范围
+            normalized = std::fmod(normalized, 360.0);
+            if (normalized < 0) {
+                normalized += 360.0;
+            }
+            normalizedObs.emplace_back(obs.pointId, normalized);
+        }
+
+        // 步骤3：获取起始边的实际方位角
+        double startAzimuth = startEdge->azimuth;
+
+        // 步骤4：计算并更新方位角
+        for (const auto& normalizedPair : normalizedObs) {
+            const auto& toPoint = normalizedPair.first;
+            const auto& normalized = normalizedPair.second;
+            double azimuth = startAzimuth + normalized;
+            azimuth = std::fmod(azimuth, 360.0);
+            if (azimuth < 0) {
+                azimuth += 360.0;
+            }
+
+            // 获取或创建边
+            DirectedEdge* edge = manager.getEdge(stationId, toPoint);
+            if (!edge) {
+                // 添加，设为未固定
+                edge = manager.addEdge(stationId, toPoint, azimuth, false);
+                edgeQueue.push({ stationId, toPoint });
 
             }
-            else { // 非起始方向
-                //这里显然使用的是未转化前的角度，这里用自己给的函数转换一下，注意不要todouble
-                // double delta = obs.value.toDouble();
-
-                double delta = AngleConverter::parseAngleString(obs.value);
-                ObsAzimuth = fmod(baseAzimuth + delta, 360.0);
-
-                // 创建新边
-                auto* newEdge = manager.addEdge(stationId, trim(obs.pointId), ObsAzimuth);
-                if (newEdge) edgeQueue.push({ stationId, trim(obs.pointId) });
-
+            else {
+                // 仅更新未固定的边
+                //if (!edge->isAzimuthFixed()) {
+                //    edge->setAzimuth(azimuth);
+                //}
+                std::cout << "Warning: Edge " << stationId << "→" << toPoint
+                    << " already exists " << std::endl;
             }
 
         }
+
     }
 }
 
