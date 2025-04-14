@@ -84,7 +84,7 @@ public:
     double getSigma() const { return sigma; }
     Eigen::MatrixXd getDx() const { return Dx; }
     const std::unordered_map<std::string, int>& getEdgeColumnMap() const { return edgeColumnMap; }
-
+    double getSigma0() const { return sigma0; }
     void printEdgeColumnMap();
 
 private:
@@ -103,7 +103,8 @@ private:
     Eigen::MatrixXd Dx;
     Eigen::VectorXd V;
     Eigen::MatrixXd NBB;
-
+    // sigma0为先验单位权中误差
+	double sigma0 = 0.0;
     std::unordered_map<std::string, int> edgeColumnMap;
 
     void processKnownPoints();

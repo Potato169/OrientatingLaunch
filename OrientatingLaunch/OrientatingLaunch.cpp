@@ -289,6 +289,187 @@ void OrientatingLaunch::processStationQueue(
 void OrientatingLaunch::buildMatrices() {
     buildEdgeColumnMapping();
 
+    vector<vector<double>> NBB;
+    vector<double> W;
+
+    // n为参数的个数
+    const int n = edgeColumnMap.size();
+    // 逐个观测值进行处理构造矩阵NBB与W
+    int row = 0;
+
+
+    // 遍历所有观测值
+    // 下面这个循环处理每个测站
+    for (const auto& stationData : reader.getObservations()) {
+        string stationId = trim(stationData.stationId);
+
+        // obsNum用来标记当前处理的观测值为本测站的第几个观测值
+        // 通常第一个观测值的改正值等于对应同名边方位角的改正值
+        // 因此需要特殊处理
+        int obsNum = 0; 
+        //initAziKey用来记录当前测站的第一个方向观测值对应在edgeColumnMap中的位置
+        int initEdgeKey = 0;
+
+		// 记录当前测站的起始以及其他方向观测值
+        DirectedEdge* initialEdge = nullptr;
+		DirectedEdge* currentEdge = nullptr;
+
+        // 定义该测站和方程观测值的权值
+        double p_sum = 0.0;
+        // 定义当前观测值的和方程余项
+        double L_sum = 0.0;
+        // 定义和方程系数阵
+        vector<double> B_row_sum(n, 0.0);
+
+		// 下面这个循环用来处理当前测站的所有观测值
+        for (const auto& obs : stationData.observations) {
+            if (obs.type == "方向观测") {
+                obsNum++;
+                row++;
+
+                // 目标点ID去空格
+                string targetId = trim(obs.pointId); 
+
+                // 按字典序生成边标识符
+                string from, to;
+                if (stationId < targetId) {
+                    from = stationId;
+                    to = targetId;
+                }
+                else {
+                    from = targetId;
+                    to = stationId;
+                }
+                string edgeKey = from + "→" + to;
+
+                // 判断边的同名边方位角是否存在参数中
+                if (edgeColumnMap.find(edgeKey) != edgeColumnMap.end()) {
+                    //directionObservations.emplace_back(stationId, obs);
+                
+                    // 计算当前观测值的权值
+                    double p = (sigma0 * sigma0) / 
+                        (stod(trim(obs.accuracyNumber))* stod(trim(obs.accuracyNumber)));
+					p_sum += 1.0/ p;
+
+					// 定义当前观测值的常数项
+                    double L = 0.0;
+
+
+                    // 定义B矩阵的第k行
+                    vector<double> B_row(n, 0.0);
+
+
+					// 当观测值为该测站的第一个方向观测时，表示零方向
+                    // 只有边的同名边方位角系数设为 1.0
+                    if (obsNum == 1) {
+						// 保留起始观测值，便于后续计算
+                        initialEdge = manager.getEdge(trim(stationId), trim(obs.pointId));
+                        if (!initialEdge) {
+                            cerr << "未找到起始边：" << stationId << endl;
+                            return;
+                        }
+						// 同时保留起始边的矩阵列号
+                        initEdgeKey = edgeColumnMap[edgeKey];
+
+                        // 计算当前误差方程的常数项，零方向常数项为0
+						L = 0.0;
+                        L_sum += L;
+
+                        // 检查 n 是否在有效范围内
+                        if (initEdgeKey >= 0 && initEdgeKey < n) {
+                            B_row[initEdgeKey] = 1.0;  // 将边的同名边方位角系数设为 1.0
+                            B_row_sum[initEdgeKey] += 1.0;
+                        }
+                        else {
+                            std::cout << "Error: build matrix element is out of bounds!" << std::endl;
+                        }
+                    }
+                    // 当观测值为该测站的其他方向观测时，零方向的系数设为 -1.0，
+                    // 其他边的同名边方位角系数设为 1.0
+                    else {
+
+                        currentEdge = manager.getEdge(trim(stationId), trim(obs.pointId));
+                        // 计算方位角差
+                        double initialAz = initialEdge->azimuth;
+                        double currentAz = currentEdge->azimuth;
+                        double delta = fmod(currentAz - initialAz + 360, 360);
+                        L = (stod(trim(obs.value)) - delta);
+                        L_sum += L;
+
+                        // 填充B矩阵
+                        string initialEdgeId = initialEdge->from < initialEdge->to ?
+                            (ostringstream() << initialEdge->from << "→" << initialEdge->to).str() :
+                            (ostringstream() << initialEdge->to << "→" << initialEdge->from).str();
+
+                        string currentEdgeId = currentEdge->from < currentEdge->to ?
+                            (ostringstream() << currentEdge->from << "→" << currentEdge->to).str() :
+                            (ostringstream() << currentEdge->to << "→" << currentEdge->from).str();
+
+                        if (edgeColumnMap.find(initialEdgeId) != edgeColumnMap.end()) {
+                            B_row[initEdgeKey] = -1.0;  // 将起始边的同名边方位角系数设为 -1.0
+							B_row_sum[initEdgeKey] += -1.0; 
+                        }
+                        if (edgeColumnMap.find(currentEdgeId) != edgeColumnMap.end()) {
+                            B_row[edgeColumnMap[currentEdgeId]] = 1.0; // 将非起始边的同名边方位角系数设为 1.0
+							B_row_sum[edgeColumnMap[currentEdgeId]] += 1.0;
+                        }
+
+                    }
+
+					// 计算B的第k行对NBB的贡献
+                    for (int i = 0; i < n; ++i) {
+                        for (int j = 0; j < n; ++j) {
+                            NBB[i][j] += p * B_row[i] * B_row[j];
+                        }
+                    }
+
+                    // 计算W的当前行贡献
+                    double scalar = p * L;
+                    for (int j = 0; j < n; ++j) {
+                        W[j] += scalar * B_row[j];
+                    }
+                }
+                else {
+                    if (obsNum == 1) {
+                        // 保留起始观测值，便于后续计算
+                        initialEdge = manager.getEdge(trim(stationId), trim(obs.pointId));
+                        if (!initialEdge) {
+                            cerr << "未找到起始边：" << stationId << endl;
+                            return;
+                        }
+                        // 同时保留起始边的矩阵列号
+                        initEdgeKey = edgeColumnMap[edgeKey];
+                }
+            }
+        }
+
+		p_sum = 1.0 / p_sum;
+
+        // 计算当前测站和方程对NBB的贡献
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                NBB[i][j] += p_sum * B_row_sum[i] * B_row_sum[j];
+            }
+        }
+
+        // 计算当前测站和方程对W的贡献
+        double scalar = p_sum * L_sum;
+        for (int j = 0; j < n; ++j) {
+            W[j] += scalar * B_row_sum[j];
+        }
+    }
+
+    // 将已知边的对应的观测值同样视作无误差观测值,因此误差方程的个数要在原有
+    // 基础之上减去已知边的数量
+
+
+
+    int m = 17;
+
+    B = Eigen::MatrixXd::Zero(m, n);
+    L = Eigen::VectorXd::Zero(m);
+    Eigen::VectorXd P(m);
+
     vector<pair<string, Ui::Observation>> directionObservations;
     for (const auto& stationData : reader.getObservations()) {
         string stationId = trim(stationData.stationId);
@@ -298,14 +479,6 @@ void OrientatingLaunch::buildMatrices() {
             }
         }
     }
-
-    int m = directionObservations.size();
-    int n = edgeColumnMap.size();
-    B = Eigen::MatrixXd::Zero(m, n);
-    L = Eigen::VectorXd::Zero(m);
-    Eigen::VectorXd P(m);
-
-
 
     for (int i = 0; i < m; ++i) {
         string stationId = directionObservations[i].first;
@@ -320,6 +493,9 @@ void OrientatingLaunch::buildMatrices() {
             processRegularObservation(i, stationId, targetId, obsValue);
         }
     }
+    const Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "");
+    cout << "B:\n" << B.format(fmt) << endl;
+
 }
 
 void OrientatingLaunch::buildEdgeColumnMapping() {
