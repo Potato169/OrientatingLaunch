@@ -77,6 +77,8 @@ public:
 
     const Eigen::MatrixXd& getBMatrix() const { return B; }
     const Eigen::VectorXd& getLMatrix() const { return L; }
+    const Eigen::MatrixXd& getNBBMatrix() const { return NBB; }
+    const Eigen::VectorXd& getWMatrix() const { return W; }
     const std::vector<AdjustmentResult>& getResults() const { return results; }
     const std::vector<AdjustmentResult>& getVResults() const { return V_results; }
     const Eigen::VectorXd& getX() const { return x; }
@@ -103,6 +105,7 @@ private:
     Eigen::MatrixXd Dx;
     Eigen::VectorXd V;
     Eigen::MatrixXd NBB;
+    Eigen::VectorXd W; // W=BTPL
     // sigma0为先验单位权中误差
 	double sigma0 = 0.0;
     std::unordered_map<std::string, int> edgeColumnMap;
