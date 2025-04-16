@@ -11,7 +11,9 @@
 
 class AngleConverter {
 public:
+    // 度分秒转化为十进制
     static double parseAngleString(const std::string& angleStr);
+    // 十进制转化为度分秒
     static std::string formatAngleString(double degrees);
 
 private:

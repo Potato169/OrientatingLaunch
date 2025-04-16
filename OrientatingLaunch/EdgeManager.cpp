@@ -1,6 +1,6 @@
 // EdgeManager.cpp
 #include "EdgeManager.h"
-
+#include "AngleConverter.h"
 
 
 // DirectedEdge 成员函数实现
@@ -131,7 +131,7 @@ void EdgeManager::printEdges() const {
 
         if (visited.find(edge) != visited.end()) continue;
 
-        std::ostringstream oss1, oss2;
+        std::ostringstream oss1, oss2, oss3, oss4;
         oss1 << std::left << std::setw(6) << edge->from << "→" << std::setw(6) << edge->to
             << " (Azimuth: " << std::fixed << std::setprecision(8) << edge->azimuth << "°)"
             << " isFixed: " << edge->isAzimuthFixed();
@@ -142,8 +142,15 @@ void EdgeManager::printEdges() const {
             << edge->reverse_edge->azimuth << "°)"
             << " isFixed: " << edge->isAzimuthFixed();
 
-        std::cout << "Edge " << oss1.str() << " | Reverse Edge " << oss2.str() << "\n";
+        oss3 << std::left << std::setw(6) << edge->from << "→" << std::setw(6) << edge->to
+            << " (Azimuth: " << AngleConverter::formatAngleString(edge->azimuth) << ")";
 
+        oss4 << std::left << std::setw(6) << edge->reverse_edge->from << "→"
+            << std::setw(6) << edge->reverse_edge->to
+            << " (Azimuth: " << AngleConverter::formatAngleString(edge->reverse_edge->azimuth)
+            << ")";
+        std::cout << "Edge " << oss1.str() << " | Reverse Edge " << oss2.str() << "\n";
+        std::cout << "Edge " << oss3.str() << " | Reverse Edge " << oss4.str() << "\n";
         visited.insert(edge);
         visited.insert(edge->reverse_edge);
     }

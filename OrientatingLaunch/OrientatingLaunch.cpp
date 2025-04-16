@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <limits>
 #include <Eigen/Dense>
+#include <string>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -218,7 +219,7 @@ void OrientatingLaunch::processStationQueue(
             DirectedEdge* edge = manager.getEdge(stationId, to);
             if (edge) {
                 try {
-                    startObsValue = std::stod(obs.value);
+                    startObsValue = AngleConverter::parseAngleString(obs.value);
                 }
                 catch (const std::exception& e) {
                     throw std::runtime_error("无效的观测值: " + obs.value);
@@ -237,15 +238,15 @@ void OrientatingLaunch::processStationQueue(
         std::vector<std::pair<std::string, double>> normalizedObs;
         for (const auto& obs : validObs) {
             if (obs.type != "方向观测") continue;
-            double value;
+            string value;
             try {
-                value = std::stod(obs.value);
+                value = obs.value;
             }
             catch (const std::exception& e) {
                 throw std::runtime_error("无效的观测值: " + obs.value);
             }
             // 计算相对于起始观测值的差值
-            double normalized = value - startObsValue;
+			double normalized = AngleConverter::parseAngleString(value) - startObsValue;
             // 调整到0-360范围
             normalized = std::fmod(normalized, 360.0);
             if (normalized < 0) {
@@ -310,6 +311,8 @@ void OrientatingLaunch::buildMatrices() {
     vector<vector<double>> B_temp;
 
     vector<double> L_temp;
+
+	vector<double> P_temp;
 
     //int m = 17;
 
@@ -402,11 +405,13 @@ void OrientatingLaunch::buildMatrices() {
                     // 计算当前观测值的权值
                     double p = (sigma0 * sigma0) /
                         (stod(trim(obs.accuracyNumber)) * stod(trim(obs.accuracyNumber)));
+					
 
                     if (p == 0) {
                         cerr << "矩阵构建失败，权值为0！" << endl;
                         return;
                     }
+                    P_temp.push_back(p);
                     p_sum += 1.0 / p;
 
                     // 定义当前观测值的常数项
@@ -452,7 +457,7 @@ void OrientatingLaunch::buildMatrices() {
                         double initialAz = initialEdge->azimuth;
                         double currentAz = currentEdge->azimuth;
                         double delta = fmod(currentAz - initialAz + 360, 360);
-						double delta2 = fmod((stod(trim(obs.value)) - initObsValue) + 360, 360);
+						double delta2 = AngleConverter::parseAngleString(trim(obs.value));
                         L = (delta2 - delta);
                         L_sum += L;
 
@@ -533,6 +538,7 @@ void OrientatingLaunch::buildMatrices() {
             W_temp[j] += scalar * B_row_sum[j];
         }
 
+        P_temp.push_back(p_sum);
         B_temp.push_back(B_row_sum); //将该行和方程系数添加到矩阵B中
 		L_temp.push_back(L_sum); //将该行和方程常数项添加到矩阵L中
         sumEquationRows.push_back(B_temp.size() - 1); // 记录和方程行的索引
@@ -565,17 +571,29 @@ void OrientatingLaunch::buildMatrices() {
         }
     }
 
-	// L赋值
+	 //L赋值
 	L = Eigen::VectorXd::Zero(m);
 	for (int i = 0; i < m; ++i) {
 		L(i) = L_temp[i];
 	}
+
+	Eigen::MatrixXd PMatrix = Eigen::Map<const Eigen::VectorXd>(P_temp.data(), P_temp.size()).asDiagonal();
+	Eigen::MatrixXd NBBTest = B.transpose() * PMatrix * B;
+	Eigen::MatrixXd WTest = B.transpose() * PMatrix * L;
+
+
+
 	// 打印矩阵
-	const Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "");
-	cout << "B:\n" << B.format(fmt) << endl;
-	cout << "L:\n" << L.format(fmt) << endl;
-	cout << "NBB:\n" << NBB.format(fmt) << endl;
+    const Eigen::IOFormat fnt(3, 0, ", ", "\n", "", "");
+    cout << "B:\n" << B.format(fnt) << endl;
+    cout << "P:\n" << PMatrix.format(fnt) << endl;
+	const Eigen::IOFormat fmt(8, 0, ", ", "\n", "", "");	
+	cout << "L:\n" << L.format(fmt) << endl;	
 	cout << "W:\n" << W.format(fmt) << endl;
+	cout << "WTest:\n" << WTest.format(fmt) << endl;
+
+    cout << "NBB:\n" << NBB.format(fmt) << endl;
+	cout << "NBBTest:\n" << NBBTest.format(fmt) << endl;
 }
 
 void OrientatingLaunch::buildEdgeColumnMapping() {
@@ -737,6 +755,7 @@ void OrientatingLaunch::calculateCorrections() {
 
     const Eigen::IOFormat fmt(8, 0, ", ", "\n", "", "");
 
+
     Eigen::MatrixXd NBB_inv = NBB.inverse();
 
     // 计算改正数 x = NBB^{-1} * B^T * P * L
@@ -818,8 +837,8 @@ void OrientatingLaunch::generateResultList() {
             res.VALUE = 
                 AngleConverter::formatAngleString(edge->azimuth);
             // res.M = QString::number(std::sqrt(Dx.diagonal()(edgeColumnMap[edgeId])), 'f', 6);
-            res.M = 
-                AngleConverter::formatAngleString(std::sqrt(Dx.diagonal()(edgeColumnMap[edgeId])));
+            //res.M = 
+            //    AngleConverter::formatAngleString(std::sqrt(Dx.diagonal()(edgeColumnMap[edgeId])));
             results.push_back(res);
         }
     }
@@ -832,16 +851,24 @@ void OrientatingLaunch::generateResultList() {
                 AdjustmentResult res;
                 res.FROM = stationData.stationId;
                 res.TO = obs.pointId;
-                res.V = AngleConverter::formatAngleString(V(obsIdx));
+                
                 // V_results[obsIdx].V = AngleConverter::formatAngleString(V(obsIdx));
 
                 // V_results[obsIdx].RESULT =
                 //     AngleConverter::formatAngleString(AngleConverter::parseAngleString(obs.value)
                 //                                                           + V(obsIdx));
-                res.VALUE = AngleConverter::formatAngleString(
-                    AngleConverter::parseAngleString(obs.value));
-                res.RESULT = AngleConverter::formatAngleString(
-                    AngleConverter::parseAngleString(obs.value)+ V(obsIdx));
+
+                // 以度分秒形式展示
+                //res.V = AngleConverter::formatAngleString(VFin(obsIdx));
+                //res.VALUE = AngleConverter::formatAngleString(
+                //    AngleConverter::parseAngleString(obs.value));
+                //res.RESULT = AngleConverter::formatAngleString(
+                //    AngleConverter::parseAngleString(obs.value)+ VFin(obsIdx));
+
+                // 以十进制展示
+                res.V = to_string(VFin(obsIdx));
+                res.VALUE = to_string(AngleConverter::parseAngleString(obs.value));
+                res.RESULT = to_string(AngleConverter::parseAngleString(obs.value) + VFin(obsIdx));
                 V_results.push_back(res);
                 ++obsIdx;
             }

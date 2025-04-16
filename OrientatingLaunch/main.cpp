@@ -32,10 +32,10 @@ int main() {
 
     auto V_results = launcher.getVResults();
     for (const auto& res : V_results) {
-        std::cout << res.FROM << res.TO << res.VALUE << res.V << res.RESULT;
-        std::cout << res.FROM << res.TO << AngleConverter::parseAngleString(res.VALUE)
-            << AngleConverter::parseAngleString(res.V)
-            << AngleConverter::parseAngleString(res.RESULT);
+        std::cout << res.FROM << '\t' << res.TO << '\t' << res.VALUE << '\t' << res.V << '\t' << res.RESULT << std::endl;
+        //std::cout << res.FROM << res.TO << AngleConverter::parseAngleString(res.VALUE)
+        //    << AngleConverter::parseAngleString(res.V)
+        //    << AngleConverter::parseAngleString(res.RESULT);
 
 
     }
