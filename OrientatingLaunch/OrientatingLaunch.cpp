@@ -12,6 +12,7 @@
 #include <regex>
 #include <iomanip>
 #include <limits>
+#include <Eigen/Dense>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -292,6 +293,9 @@ void OrientatingLaunch::processStationQueue(
 
 
 void OrientatingLaunch::buildMatrices() {
+
+    sumEquationRows.clear(); // 清空之前的记录
+	// 构造每个参数的列索引，每个方位角对应一个参数
     buildEdgeColumnMapping();
 
     // n为参数的个数
@@ -340,7 +344,7 @@ void OrientatingLaunch::buildMatrices() {
     //cout << "B:\n" << B.format(fmt) << endl;
 
 
-
+    originalObsCounter = 0;
     // 遍历所有观测值
     // 下面这个循环处理每个测站
     for (const auto& stationData : reader.getObservations()) {
@@ -391,7 +395,9 @@ void OrientatingLaunch::buildMatrices() {
 
                 // 判断边的同名边方位角是否存在参数中
                 if (edgeColumnMap.find(edgeKey) != edgeColumnMap.end()) {
-                    //directionObservations.emplace_back(stationId, obs);
+                    originalObsIndices.push_back(originalObsCounter);
+                    isSumEquationRow.push_back(false);
+
 
                     // 计算当前观测值的权值
                     double p = (sigma0 * sigma0) /
@@ -488,6 +494,7 @@ void OrientatingLaunch::buildMatrices() {
 					L_temp.push_back(L); //将该行常数项添加到常数项阵L中
                 }
                 else {
+                    filteredObsIndices.push_back(originalObsCounter);
                     if (obsNum == 1) {
                         // 保留起始观测值，便于后续计算
                         initialEdge = manager.getEdge(trim(stationId), trim(obs.pointId));
@@ -499,6 +506,9 @@ void OrientatingLaunch::buildMatrices() {
                         initEdgeKey = -1;
                     }
                 }
+
+                originalObsCounter++;
+
             }
 
 
@@ -525,6 +535,8 @@ void OrientatingLaunch::buildMatrices() {
 
         B_temp.push_back(B_row_sum); //将该行和方程系数添加到矩阵B中
 		L_temp.push_back(L_sum); //将该行和方程常数项添加到矩阵L中
+        sumEquationRows.push_back(B_temp.size() - 1); // 记录和方程行的索引
+        isSumEquationRow.push_back(true); // 标记为和方程行
     }
 
 	// NBB矩阵赋值
@@ -723,7 +735,7 @@ void OrientatingLaunch::calculateCorrections() {
     // 计算法方程矩阵 NBB = B^T * P * B (P暂时设为单位矩阵)
     //NBB = B.transpose() * B;
 
-    const Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "");
+    const Eigen::IOFormat fmt(8, 0, ", ", "\n", "", "");
 
     Eigen::MatrixXd NBB_inv = NBB.inverse();
 
@@ -778,6 +790,15 @@ void OrientatingLaunch::calculateAccuracyParameters() {
 
 void OrientatingLaunch::generateResultList() {
     results.clear();
+	Eigen::VectorXd V1 = calVNoSum();
+	Eigen::VectorXd V2 = calVFin();
+
+
+    const Eigen::IOFormat fmt(8, 0, ", ", "\n", "", "");
+    cout << "V:\n" << V.format(fmt) << endl;
+    cout << "VNoSum:\n" << V1.format(fmt) << endl;
+
+    cout << "VFin:\n" << V2.format(fmt) << endl;
 
     // 填充边结果
     for (const auto& edgeIdPair : edgeColumnMap) {
@@ -870,4 +891,43 @@ bool OrientatingLaunch::processKnownAngel() {
     }
 
     return true;
+}
+
+
+Eigen::VectorXd OrientatingLaunch::calVNoSum(){
+    std::unordered_set<int> sum_rows_set(sumEquationRows.begin(), sumEquationRows.end());
+    vector<int> keep_indices;
+    keep_indices.reserve(V.size() - sumEquationRows.size());
+
+    for (int i = 0; i < V.size(); ++i) {
+        if (!sum_rows_set.count(i)) {
+            keep_indices.push_back(i);
+        }
+    }
+
+    VNoSum = Eigen::VectorXd::Zero(keep_indices.size());
+    for (size_t j = 0; j < keep_indices.size(); ++j) {
+        VNoSum[j] = V[keep_indices[j]];
+    }
+
+    return VNoSum;
+}
+
+Eigen::VectorXd OrientatingLaunch::calVFin(){
+    // 初始化VFin为全零，长度等于所有原始方向观测数
+    VFin = Eigen::VectorXd::Zero(originalObsCounter);
+
+    // 遍历所有处理过的行，填充有效改正值
+    int vIndex = 0; // V向量中的索引
+    for (size_t i = 0; i < isSumEquationRow.size(); ++i) {
+        if (!isSumEquationRow[i]) {
+            // 普通行，从originalObsIndices获取原始索引
+            int originalIdx = originalObsIndices[vIndex];
+            VFin[originalIdx] = VNoSum[vIndex];
+            vIndex++;
+        }
+        // 和方程行直接跳过
+    }
+
+    return VFin;
 }

@@ -20,12 +20,12 @@ int main() {
     manager.printEdges();
 	std::cout << "已知边的数量：" << manager.getFixedEdgeCount() << std::endl;
     launcher.performAdjustment();
-    launcher.printEdgeColumnMap();
+    //launcher.printEdgeColumnMap();
 
     manager.printEdges();
 
     // // 获取结果
-    // auto results = launcher.getResults();
+     auto results = launcher.getResults();
     // for (const auto& res : results) {
     //     qDebug() << res.FROM << res.TO << res.RESULT << res.M << res.V ;
     // }`
