@@ -111,6 +111,7 @@ private:
 	Eigen::VectorXd VFin;// 这里的改正值不包含和方程改正，且包含了没有参与平差的观测值改正，为最终结果
     Eigen::MatrixXd NBB;
     Eigen::VectorXd W; // W=BTPL
+    std::vector<double> P; // 对角权阵P的向量形式
     // sigma0为先验单位权中误差
 	double sigma0 = 0.0;
     std::unordered_map<std::string, int> edgeColumnMap;

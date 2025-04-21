@@ -18,7 +18,7 @@ int main() {
     OrientatingLaunch launcher(manager, reader);
     launcher.initializeEdges();
     manager.printEdges();
-	std::cout << "已知边的数量：" << manager.getFixedEdgeCount() << std::endl;
+
     launcher.performAdjustment();
     //launcher.printEdgeColumnMap();
 

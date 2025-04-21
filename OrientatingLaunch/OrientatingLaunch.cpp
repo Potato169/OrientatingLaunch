@@ -107,9 +107,17 @@ void OrientatingLaunch::processObservations() {
     queue<string> stationQueue;
     unordered_map<string, Ui::ObservationData> unprocessedStations;
 
+	// 遍历manager对象，查找以建立的边，这些边即作为起始边
+    // 用来初始化edgeQueue进行后续处理
     queue<pair<string, string>> edgeQueue;
-    edgeQueue.push({ "TWD1", "FWD1" });
-    edgeQueue.push({ "TWD2", "FWD2" });
+    for (auto it = manager.begin(); it != manager.end(); ++it) {
+        string from = it->first.first;
+        string to = it->first.second;
+        edgeQueue.push({ from, to });
+    }
+
+    //edgeQueue.push({ "TWD1", "FWD1" });
+    //edgeQueue.push({ "TWD2", "FWD2" });
 
     for (const auto& data : obsData) {
         unprocessedStations[data.stationId] = data;
@@ -409,10 +417,19 @@ void OrientatingLaunch::buildMatrices() {
                     originalObsIndices.push_back(originalObsCounter);
                     isSumEquationRow.push_back(false);
 
+                    double p = 0.0;
+                    // 当该观测值对应的边为已知边时默认观测精度为0.0001秒，几乎不存在误差
+                    // 对应权重也会变大，相当于没有改正
+                    if (manager.getEdge(trim(stationId), trim(obs.pointId))->isAzimuthFixed()) {   
+                        p = (sigma0 * sigma0) /
+                            (0.0001 * 0.0001);
+                    }
+                    // 当该观测值对应的边为未知边时根据读取的文件正常计算即可
+                    else {
+                        p = (sigma0 * sigma0) /
+                            (stod(trim(obs.accuracyNumber)) * stod(trim(obs.accuracyNumber)));
+                    }
 
-                    // 计算当前观测值的权值
-                    double p = (sigma0 * sigma0) /
-                        (stod(trim(obs.accuracyNumber)) * stod(trim(obs.accuracyNumber)));
 					
 
                     if (p == 0) {
@@ -507,21 +524,24 @@ void OrientatingLaunch::buildMatrices() {
 					L_temp.push_back(L); //将该行常数项添加到常数项阵L中
                 }
                 else {
-                    filteredObsIndices.push_back(originalObsCounter);
-                    if (obsNum == 1) {
-                        // 保留起始观测值，便于后续计算
-                        initialEdge = manager.getEdge(trim(stationId), trim(obs.pointId));
-                        if (!initialEdge) {
-                            cerr << "未找到起始边：" << stationId << endl;
-                            return;
-                        }
+                    cerr << "build Matrix error！Please check the process when initialing edge" << endl;
 
-                        initEdgeKey = -1;
-                    }
-                    else {
-						// 这里还有一个逻辑未完善，因为可能存在某个测站的非第一个观测值
-                        // 不在参数列表的情形，
-                    }
+
+      //              filteredObsIndices.push_back(originalObsCounter);
+      //              if (obsNum == 1) {
+      //                  // 保留起始观测值，便于后续计算
+      //                  initialEdge = manager.getEdge(trim(stationId), trim(obs.pointId));
+      //                  if (!initialEdge) {
+      //                      cerr << "未找到起始边：" << stationId << endl;
+      //                      return;
+      //                  }
+
+      //                  initEdgeKey = -1;
+      //              }
+      //              else {
+						//// 这里还有一个逻辑未完善，因为可能存在某个测站的非第一个观测值
+      //                  // 不在参数列表的情形，
+      //              }
                 }
 
                 originalObsCounter++;
@@ -589,14 +609,17 @@ void OrientatingLaunch::buildMatrices() {
 		L(i) = L_temp[i];
 	}
 
-	Eigen::MatrixXd PMatrix = Eigen::Map<const Eigen::VectorXd>(P_temp.data(), P_temp.size()).asDiagonal();
+
+	Eigen::MatrixXd PMatrix = Eigen::Map<const Eigen::VectorXd>
+        (P_temp.data(), P_temp.size()).asDiagonal();
+    P = P_temp;
 	Eigen::MatrixXd NBBTest = B.transpose() * PMatrix * B;
 	Eigen::MatrixXd WTest = B.transpose() * PMatrix * L;
 
 
 
 	// 打印矩阵
-    const Eigen::IOFormat fnt(3, 0, ", ", "\n", "", "");
+    const Eigen::IOFormat fnt(1, 0, ", ", "\n", "", "");
     cout << "B:\n" << B.format(fnt) << endl;
     cout << "P:\n" << PMatrix.format(fnt) << endl;
 	const Eigen::IOFormat fmt(8, 0, ", ", "\n", "", "");	
@@ -618,7 +641,7 @@ void OrientatingLaunch::buildEdgeColumnMapping() {
         pair<string, string> reversePair(to, from);
 
         // 当边为固定边时不参与平差
-        if (it->second->isAzimuthFixed()) continue;
+        //if (it->second->isAzimuthFixed()) continue;
 
         if (processedEdges.find(reversePair) == processedEdges.end()) {
             ostringstream edgeIdStream;
@@ -812,8 +835,13 @@ void OrientatingLaunch::calculateAccuracyParameters() {
     int m = V.size();
     int n = edgeColumnMap.size();
 
+    
+    for (int i = 0; i < V.size(); ++i) {
+        sigma += V(i) * P[i] * V(i);
+    }
+
     // 计算单位权中误差
-    sigma = std::sqrt(V.squaredNorm() / (m - n));
+    sigma = std::sqrt(sigma / (m - n));
 
     // 计算协方差矩阵 Dx = Qx * sigma^2
     Dx = Qx * std::pow(sigma, 2);
@@ -918,12 +946,13 @@ bool OrientatingLaunch::processKnownAngel() {
 
     }
 
-    //若没有已知方位角则采用已知点反算已知方位角
+    //若没有已知方位角则采用已知点反算已知方位角，跳出当前函数
     if (fwObservations.empty()) {
         cout << "没有已知方位角!从已知点反算方位角";
         return false; // 已知方位角数据为空直接返回
     }
 
+	// 遍历已知方位角数据，向edgemanager中添加边
     for (int i = 0; i < fwObservations.size(); i++) {
         manager.addEdge(fwObservations[i].first,
             trim(fwObservations[i].second.pointId),

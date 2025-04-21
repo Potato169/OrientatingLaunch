@@ -24,9 +24,9 @@ void DirectedEdge::setAzimuth(double new_azimuth) {
 
 
 void DirectedEdge::setAzimuthInternal(double new_azimuth, bool propagate) {
-    if (isFixed) {
-        throw std::invalid_argument("Azimuth of fixed edge cannot be modified.");
-    }
+    //if (isFixed) {
+    //    throw std::invalid_argument("Azimuth of fixed edge cannot be modified.");
+    //}
     if (new_azimuth < 0.0 || new_azimuth >= 360.0) {
         throw std::invalid_argument("Azimuth must be in [0, 360) degrees");
     }
