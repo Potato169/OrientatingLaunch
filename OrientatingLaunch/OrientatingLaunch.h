@@ -150,7 +150,7 @@ private:
     static std::string trim(const std::string& s);
     static bool startsWith(const std::string& s, const std::string& prefix);
     static std::vector<std::string> split(const std::string& s, const std::string& delimiter);
-
+    std::string doubleToString(const double value, int precision = 8);
 
 	Eigen::VectorXd calVNoSum();// 这里得到的V剔除了和方程改正
     Eigen::VectorXd calVFin();// 这里在VNoSum的基础之上添加了没有参与平差的观测值改正

@@ -54,6 +54,14 @@ double OrientatingLaunch::calculateAzimuth(const Ui::KnownPoint& from,
     return fmod(azimuth + 360.0, 360.0);
 }
 
+string OrientatingLaunch::doubleToString(const double value, int precision) { // 默认保留8位小数
+    ostringstream oss;
+    oss << fixed << setprecision(precision) << value;
+    return oss.str();
+}
+
+
+
 OrientatingLaunch::OrientatingLaunch(EdgeManager& manager,
     const In2FileReader& reader)
     : manager(manager), reader(reader) {
@@ -510,6 +518,10 @@ void OrientatingLaunch::buildMatrices() {
 
                         initEdgeKey = -1;
                     }
+                    else {
+						// 这里还有一个逻辑未完善，因为可能存在某个测站的非第一个观测值
+                        // 不在参数列表的情形，
+                    }
                 }
 
                 originalObsCounter++;
@@ -859,16 +871,17 @@ void OrientatingLaunch::generateResultList() {
                 //                                                           + V(obsIdx));
 
                 // 以度分秒形式展示
-                //res.V = AngleConverter::formatAngleString(VFin(obsIdx));
-                //res.VALUE = AngleConverter::formatAngleString(
-                //    AngleConverter::parseAngleString(obs.value));
-                //res.RESULT = AngleConverter::formatAngleString(
-                //    AngleConverter::parseAngleString(obs.value)+ VFin(obsIdx));
+                res.V = AngleConverter::formatAngleString(VFin(obsIdx));
+                res.VALUE = AngleConverter::formatAngleString(
+                    AngleConverter::parseAngleString(obs.value));
+                res.RESULT = AngleConverter::formatAngleString(
+                    AngleConverter::parseAngleString(obs.value)+ VFin(obsIdx));
 
-                // 以十进制展示
-                res.V = to_string(VFin(obsIdx));
-                res.VALUE = to_string(AngleConverter::parseAngleString(obs.value));
-                res.RESULT = to_string(AngleConverter::parseAngleString(obs.value) + VFin(obsIdx));
+                // 以十进制展示   
+                //res.V = doubleToString(VFin(obsIdx));
+                //res.VALUE = doubleToString(AngleConverter::parseAngleString(obs.value));
+                //res.RESULT = doubleToString(AngleConverter::parseAngleString(obs.value) + VFin(obsIdx));
+
                 V_results.push_back(res);
                 ++obsIdx;
             }
