@@ -306,9 +306,6 @@ void OrientatingLaunch::processStationQueue(
     }
 }
 
-
-
-
 void OrientatingLaunch::buildMatrices() {
 
     sumEquationRows.clear(); // 清空之前的记录
@@ -962,7 +959,6 @@ bool OrientatingLaunch::processKnownAngel() {
     return true;
 }
 
-
 Eigen::VectorXd OrientatingLaunch::calVNoSum(){
     std::unordered_set<int> sum_rows_set(sumEquationRows.begin(), sumEquationRows.end());
     vector<int> keep_indices;
@@ -999,4 +995,59 @@ Eigen::VectorXd OrientatingLaunch::calVFin(){
     }
 
     return VFin;
+}
+
+
+void OrientatingLaunch::convertAzimuths(GeodeticAlgorithm algorithm) {
+    std::set<std::pair<std::string, std::string>> processedEdges;
+
+    for (auto it = manager.begin(); it != manager.end(); ++it) {
+        const auto& edgeKey = it->first;
+        const std::string& from = edgeKey.first;
+        const std::string& to = edgeKey.second;
+        const auto reverseKey = std::make_pair(to, from);
+
+        // 跳过已处理的反向边
+        if (processedEdges.find(reverseKey) != processedEdges.end()) continue;
+        processedEdges.insert(edgeKey);
+
+        DirectedEdge* edge = it->second;
+        double originalAzimuth = edge->azimuth;
+
+        // 平面坐标方位角转大地方位角
+        double geodeticAzimuth = 0.0;
+        switch (algorithm) {
+        case GeodeticAlgorithm::Algorithm1:
+            geodeticAzimuth = convertToGeodeticAzimuth(originalAzimuth, algorithm);
+            break;
+        case GeodeticAlgorithm::Algorithm2:
+            geodeticAzimuth = convertToGeodeticAzimuth(originalAzimuth, algorithm);
+            break;
+        }
+
+        // 天文方位角转换判断
+        if (hasAstronomicalInfo(edge)) {
+            double astronomicalAzimuth = convertToAstronomicalAzimuth(geodeticAzimuth);
+            edge->setAzimuth(astronomicalAzimuth);
+        }
+        else {
+            edge->setAzimuth(geodeticAzimuth);
+        }
+    }
+}
+
+// 辅助函数占位实现（待补充）
+bool OrientatingLaunch::hasAstronomicalInfo(const DirectedEdge* edge) const {
+    // 待补充天文方位角判断条件
+    return false;
+}
+
+double OrientatingLaunch::convertToGeodeticAzimuth(double planeAzimuth, GeodeticAlgorithm algorithm) const {
+    // 待补充具体转换算法
+    return planeAzimuth;
+}
+
+double OrientatingLaunch::convertToAstronomicalAzimuth(double geodeticAzimuth) const {
+    // 待补充天文方位角转换算法
+    return geodeticAzimuth;
 }
