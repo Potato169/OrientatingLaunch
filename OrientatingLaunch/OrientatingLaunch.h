@@ -4,6 +4,7 @@
 
 #include "EdgeManager.h"
 #include "In2FileReader.h"
+#include "tapeFileReader.h"
 #include <Eigen/Dense>
 #include <vector>
 #include <queue>
@@ -11,6 +12,7 @@
 #include <unordered_set>
 #include <string>
 #include <utility>
+#include <map>
 
 struct AdjustmentResult {
     std::string FROM;
@@ -67,13 +69,24 @@ private:
 
 class OrientatingLaunch {
 public:
-    OrientatingLaunch(EdgeManager& manager, const In2FileReader& reader);
+    //OrientatingLaunch(EdgeManager& manager, const In2FileReader& reader);
+	OrientatingLaunch(EdgeManager& manager, const In2FileReader& reader,
+        tapeFileReader& tapeReader = tapeFileReader::getDefaultTapeReader());
     OrientatingLaunch(const OrientatingLaunch&) = delete;
     OrientatingLaunch& operator=(const OrientatingLaunch&) = delete;
 
+    //   这里是射向标定的基本方法主要包括：
+    //   1.初始化估计网中的每一条边的近似方位角
+    //   2.构建系数矩阵、法方程、观测值向量、权阵等平差计算必要的数据
+    //   3.进行平差计算与精度评定
+	//   4.将结果按一定格式输出
+	//   5.提供这些结果的访问接口
+	//   6.当提供了标尺观测数据时，额外执行标尺观测数据的处理（可选）
     void initializeEdges();
     void buildMatrices();
     void performAdjustment();
+    bool processTapeData();
+
 
     const Eigen::MatrixXd& getBMatrix() const { return B; }
     const Eigen::VectorXd& getLMatrix() const { return L; }
@@ -92,9 +105,22 @@ public:
     double getSigma0() const { return sigma0; }
     void printEdgeColumnMap();
 
+
+	//  由于上面的平差结果为平面坐标方位角
+    // 下面的模块用于将平面坐标方位角转换为天文方位角或大地方位角
+	// 算法选择枚举类型
+    // 方便在计算大地方位角的两种算法间切换，对比结果
+    enum class GeodeticAlgorithm { Algorithm1, Algorithm2 };
+
+	// 转换函数主体
+    void convertAzimuths(GeodeticAlgorithm algorithm);
+
+
 private:
     EdgeManager& manager;
     const In2FileReader& reader;
+
+    tapeFileReader& tapeReader;
 
     std::unordered_set<std::string> processedStations;
 
@@ -155,6 +181,20 @@ private:
 
 	Eigen::VectorXd calVNoSum();// 这里得到的V剔除了和方程改正
     Eigen::VectorXd calVFin();// 这里在VNoSum的基础之上添加了没有参与平差的观测值改正
+
+
+	// 平面坐标方位角转换天文方位角模块的辅助函数
+	// 判断该边是否有对应天文信息
+    bool hasAstronomicalInfo(const DirectedEdge* edge) const;
+	// 平面坐标方位角转换大地方位角
+    double convertToGeodeticAzimuth(double planeAzimuth, GeodeticAlgorithm algorithm) const;
+	// 大地方位角转换天文方位角
+    double convertToAstronomicalAzimuth(double geodeticAzimuth) const;
+
+	// 标尺数据处理辅助函数
+    // 初始化方位角
+    bool processPartTapeValue(partTape& part);
+    bool calPartTapeValue(partTape& part);
 
 };
 

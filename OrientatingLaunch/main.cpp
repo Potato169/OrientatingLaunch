@@ -1,4 +1,5 @@
 #include "In2FileReader.h"
+#include "tapeFileReader.h"
 #include <iostream>
 #include <iomanip>
 #include "EdgeManager.h"
@@ -8,8 +9,10 @@
 int main() {
 
     In2FileReader reader;
-    reader.readIn2File("D:/data/sxbd_2.in2");
+    reader.readIn2File("D:/data/complex.in2");
 
+	tapeFileReader tapeReader;
+    //tapeReader.readTapeFile("D:/data/sxbd_2.in2");
 
 	std::cout << std::fixed << std::setprecision(8);
 
@@ -25,7 +28,7 @@ int main() {
     manager.printEdges();
 
     // // 获取结果
-     auto results = launcher.getResults();
+    auto results = launcher.getResults();
     // for (const auto& res : results) {
     //     qDebug() << res.FROM << res.TO << res.RESULT << res.M << res.V ;
     // }`
@@ -36,7 +39,9 @@ int main() {
         //std::cout << res.FROM << res.TO << AngleConverter::parseAngleString(res.VALUE)
         //    << AngleConverter::parseAngleString(res.V)
         //    << AngleConverter::parseAngleString(res.RESULT);
-
-
     }
+     
+    launcher.processTapeData();
+         
+
 }

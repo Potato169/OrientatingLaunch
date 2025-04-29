@@ -44,6 +44,7 @@ bool In2FileReader::readIn2File(const std::string& filePath) {
         }
     }
 
+
     // 读取已知点
     while (getline(iss, line)) {
         if (line.find_first_not_of(" \t\r\n") == std::string::npos) break;
@@ -55,7 +56,11 @@ bool In2FileReader::readIn2File(const std::string& filePath) {
             point.y = stod(parts[2]);
             knownPoints.push_back(point);
         }
+        else {
+            break;
+        }
     }
+
 
     // 读取观测数据
     while (getline(iss, line)) {

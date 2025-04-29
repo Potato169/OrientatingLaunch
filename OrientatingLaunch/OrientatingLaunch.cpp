@@ -21,7 +21,7 @@
 
 using namespace std;
 
-// 定义极小值 epsilon）
+// 定义极小值 epsilon
 const double epsilon = std::numeric_limits<double>::epsilon() * 10; // 例如 10 倍 epsilon
 
 // 辅助函数实现
@@ -62,11 +62,19 @@ string OrientatingLaunch::doubleToString(const double value, int precision) { //
 
 
 
+//OrientatingLaunch::OrientatingLaunch(EdgeManager& manager,
+//    const In2FileReader& reader)
+//    : manager(manager), reader(reader) {
+//    sigma0 = reader.getAccuracyValues()[0].directionPrecision;
+//}
+
 OrientatingLaunch::OrientatingLaunch(EdgeManager& manager,
-    const In2FileReader& reader)
-    : manager(manager), reader(reader) {
+    const In2FileReader& reader, tapeFileReader& tapeReader)
+    : manager(manager), reader(reader), tapeReader(tapeReader) {
     sigma0 = reader.getAccuracyValues()[0].directionPrecision;
 }
+
+
 
 void OrientatingLaunch::initializeEdges() {
     try {
@@ -84,22 +92,63 @@ void OrientatingLaunch::initializeEdges() {
 void OrientatingLaunch::processKnownPoints() {
     auto points = reader.getKnownPoints();
 
-    vector<Ui::KnownPoint> twdPoints, fwdPoints;
-    for (const auto& p : points) {
-        string id = trim(p.id);
-        if (startsWith(id, "TWD")) twdPoints.push_back(p);
-        if (startsWith(id, "FWD")) fwdPoints.push_back(p);
+    //vector<Ui::KnownPoint> twdPoints, fwdPoints;
+    //for (const auto& p : points) {
+    //    string id = trim(p.id);
+    //    if (startsWith(id, "TWD")) twdPoints.push_back(p);
+    //    if (startsWith(id, "FWD")) fwdPoints.push_back(p);
+    //}
+
+    //if (twdPoints.size() != 2 || fwdPoints.size() != 2) {
+    //    throw runtime_error("需要恰好2个TWD点和2个FWD点");
+    //}
+
+      // 构建点ID集合和映射
+    std::unordered_set<std::string> point_ids;
+    std::unordered_map<std::string, Ui::KnownPoint> point_map;
+    for (const auto& point : points) {
+        point_ids.insert(trim(point.id));
+        point_map[trim(point.id)] = point;
     }
 
-    if (twdPoints.size() != 2 || fwdPoints.size() != 2) {
-        throw runtime_error("需要恰好2个TWD点和2个FWD点");
+    // 遍历观测值
+    for (const auto& stationData : reader.getObservations()) {
+        string from_id = trim(stationData.stationId);
+        for (const auto& obs : stationData.observations) {
+            if (obs.type == "方向观测") {
+                string to_id = trim(obs.pointId);
+                // 检查两个端点是否存在
+                if (point_ids.count(from_id) && point_ids.count(to_id)) {
+                    const auto& from_point = point_map.at(from_id);
+                    const auto& to_point = point_map.at(to_id);
+
+                    // 计算坐标差
+                    double dx = to_point.x - from_point.x;
+                    double dy = to_point.y - from_point.y;
+
+                    // 计算方位角（单位：弧度）
+                    double azimuth_rad = std::atan2(dy, dx); // 注意参数顺序为dx, dy
+                    double azimuth_deg = azimuth_rad * 180.0 / M_PI;
+
+                    // 调整到0-360度范围
+                    if (azimuth_deg < 0) {
+                        azimuth_deg += 360.0;
+                    }
+
+                    // 添加边
+                    auto knownEdge = manager.addEdge(from_id, to_id, azimuth_deg, true);
+                }
+            }
+        }   
     }
 
-    double az1 = calculateAzimuth(twdPoints[0], fwdPoints[0]);
-    double az2 = calculateAzimuth(twdPoints[1], fwdPoints[1]);
+    
 
-    manager.addEdge(trim(twdPoints[0].id), trim(fwdPoints[0].id), az1, true);
-    manager.addEdge(trim(twdPoints[1].id), trim(fwdPoints[1].id), az2, true);
+    //double az1 = calculateAzimuth(twdPoints[0], fwdPoints[0]);
+    //double az2 = calculateAzimuth(twdPoints[1], fwdPoints[1]);
+
+    //manager.addEdge(trim(twdPoints[0].id), trim(fwdPoints[0].id), az1, true);
+    //manager.addEdge(trim(twdPoints[1].id), trim(fwdPoints[1].id), az2, true);
 }
 
 void OrientatingLaunch::processObservations() {
@@ -107,7 +156,7 @@ void OrientatingLaunch::processObservations() {
     queue<string> stationQueue;
     unordered_map<string, Ui::ObservationData> unprocessedStations;
 
-	// 遍历manager对象，查找以建立的边，这些边即作为起始边
+	// 遍历manager对象，查找已建立的边，这些边即作为起始边
     // 用来初始化edgeQueue进行后续处理
     queue<pair<string, string>> edgeQueue;
     for (auto it = manager.begin(); it != manager.end(); ++it) {
@@ -116,8 +165,6 @@ void OrientatingLaunch::processObservations() {
         edgeQueue.push({ from, to });
     }
 
-    //edgeQueue.push({ "TWD1", "FWD1" });
-    //edgeQueue.push({ "TWD2", "FWD2" });
 
     for (const auto& data : obsData) {
         unprocessedStations[data.stationId] = data;
@@ -171,58 +218,22 @@ void OrientatingLaunch::processStationQueue(
 
         Ui::ObservationData data = unprocessedStations[stationId];
 
-        // 查找起始方向（观测值为0的L类型）
+        // 查找起始方向（观测值为0的L类型）(待改正)
         vector<Ui::Observation> validObs;
+        int obsNum = 0;
         for (const auto& obs : data.observations) {
-            if (obs.type == "方向观测" && stod(obs.value) == 0.0) {
+            if (obs.type == "方向观测" && obsNum == 0) {
                 validObs.insert(validObs.begin(), obs); // 优先处理起始方向
+                obsNum++;
             }
             else if (obs.type == "方向观测") {
                 validObs.push_back(obs);
+                obsNum++;
             }
+            
         }
 
         if (validObs.empty()) continue;
-
-        //double baseAzimuth = 0.0;
-        //double ObsAzimuth = 0.0;
-        //// 处理所有观测值
-        //for (const auto& obs : validObs) {
-        //    if (stod(obs.value) == 0.0) {  
-        //        //起始方向, 这里逻辑存在问题，如果
-        //        //起始方向未提前在edge_map中定义，那么将初始化失败
-        //        auto* edge = manager.getEdge(stationId, trim(obs.pointId));
-        //        if (edge) {
-        //            baseAzimuth = edge->azimuth;
-        //        }
-        //        else {
-        //            edge = manager.getEdge(trim(obs.pointId), stationId);
-        //            if (edge) {
-        //                baseAzimuth = fmod(edge->azimuth + 180.0, 360.0);
-        //            }
-        //            else {
-
-        //            }
-        //        }
-        //        // 创建新边
-        //        auto* newEdge = manager.addEdge(stationId, trim(obs.pointId), baseAzimuth);
-        //        if (newEdge) edgeQueue.push({ stationId, trim(obs.pointId) });
-
-        //    }
-        //    else { // 非起始方向
-        //        //这里显然使用的是未转化前的角度，这里用自己给的函数转换一下，注意不要todouble
-        //        // double delta = obs.value.toDouble();
-
-        //        double delta = AngleConverter::parseAngleString(obs.value);
-        //        ObsAzimuth = fmod(baseAzimuth + delta, 360.0);
-
-        //        // 创建新边
-        //        auto* newEdge = manager.addEdge(stationId, trim(obs.pointId), ObsAzimuth);
-        //        if (newEdge) edgeQueue.push({ stationId, trim(obs.pointId) });
-
-        //    }
-
-        //}
 
         // 步骤1：查找存在的起始边
         DirectedEdge* startEdge = nullptr;
@@ -998,6 +1009,7 @@ Eigen::VectorXd OrientatingLaunch::calVFin(){
 }
 
 
+// 将平面坐标方位角转换为大地方位角以及天文方位角的模块
 void OrientatingLaunch::convertAzimuths(GeodeticAlgorithm algorithm) {
     std::set<std::pair<std::string, std::string>> processedEdges;
 
@@ -1050,4 +1062,92 @@ double OrientatingLaunch::convertToGeodeticAzimuth(double planeAzimuth, Geodetic
 double OrientatingLaunch::convertToAstronomicalAzimuth(double geodeticAzimuth) const {
     // 待补充天文方位角转换算法
     return geodeticAzimuth;
+}
+
+// 标尺数据处理模块
+bool OrientatingLaunch::processTapeData() {
+    
+
+    for (partTape& part : tapeReader.TapeData) {
+        if (!processPartTapeValue(part)) {
+			cerr << "处理部分标尺数据失败！" << endl;
+			return false;
+        }
+        if (!calPartTapeValue(part)) {
+			cerr << "计算部分标尺数据失败！" << endl;
+			return false;
+        }
+        
+    }
+
+    return true;
+}
+
+
+
+bool OrientatingLaunch::processPartTapeValue(partTape& part) {
+    string jzdId = part.JZId;
+	string firstMzdId = part.MzdData[0].MzdId;
+	string finalMzdId = part.MzdData[part.MzdData.size() - 1].MzdId;
+
+	// 先将两个观测瞄准点的方位角初始化，使用平差之后的方位角，在manager对象中检索
+	DirectedEdge* firstMzdEdge = manager.getEdge(jzdId, firstMzdId);
+	DirectedEdge* finalMzdEdge = manager.getEdge(jzdId, finalMzdId);
+    if (!firstMzdEdge) {
+		throw std::invalid_argument("Invalid edge variation when initializing part tape");
+		return false;
+    }
+    else {
+		part.MzdData[0].fwValue = firstMzdEdge->azimuth;
+		part.MzdData[part.MzdData.size() - 1].fwValue = finalMzdEdge->azimuth;
+    }
+
+	// 然后遍历观测值找到距离观测值
+    for (const auto& stationData : reader.getObservations()) {
+		string stationId = trim(stationData.stationId);
+        if (stationId != jzdId) continue;
+		for (const auto& obs : stationData.observations) {
+			if (obs.type == "距离观测") {
+                string targetId = trim(obs.pointId);
+                if (targetId == firstMzdId) {
+                    part.MzdData[0].distValue = stod(obs.value);
+                }
+                else if (targetId == finalMzdId) {
+                    part.MzdData[part.MzdData.size() - 1].distValue = stod(obs.value);
+                }
+
+			}
+		}
+    }
+
+	// 计算从起始方向到终止方向的方向值，范围在0-360之间
+	double absDeltaFw = fmod(
+		part.MzdData[part.MzdData.size() - 1].fwValue -
+		part.MzdData[0].fwValue + 360.0, 360.0);
+
+	// 将较差归算到0到180之间
+    if (absDeltaFw >= 360.0 || absDeltaFw < 0.0) {
+		cerr << "方向值超出范围！" << endl;
+    }
+	// 当方向值大于180时，更换起始方向，从终止方向起算处理数据
+    else if (absDeltaFw > 180.0) {
+		absDeltaFw = 360.0 - absDeltaFw;
+
+
+	}else if (absDeltaFw < -180.0) {
+		
+	}
+    
+    // 
+
+
+
+    return true;
+}
+
+bool OrientatingLaunch::calPartTapeValue(partTape& part) {
+
+
+
+    return true;
 }
