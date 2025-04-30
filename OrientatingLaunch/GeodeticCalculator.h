@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
-#include "eigen34/Eigen/Dense"
+#include <Eigen/Dense>
 #include "AngleConversion.h"
 #include "CoordSystem.h"
 #include "FileOperate.h"

@@ -19,6 +19,7 @@ int main() {
     EdgeManager manager;
 
     OrientatingLaunch launcher(manager, reader);
+    launcher.readPointsFromFile("D:/data/tapeCoord.txt");
     launcher.initializeEdges();
     manager.printEdges();
 

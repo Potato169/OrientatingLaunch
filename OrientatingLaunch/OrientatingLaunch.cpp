@@ -1,3 +1,4 @@
+
 #include "OrientatingLaunch.h"
 #include "AngleConverter.h"
 #include <cmath>
@@ -173,6 +174,54 @@ void OrientatingLaunch::processObservations() {
     while (!edgeQueue.empty() || !stationQueue.empty()) {
         processEdgeQueue(edgeQueue, unprocessedStations, stationQueue);
         processStationQueue(stationQueue, edgeQueue, unprocessedStations);
+    }
+
+	// 处理完所有测站后，检查是否有未处理的测站
+    for (auto it = processedStations.begin(); it != processedStations.end(); ++it) {
+		auto stationId = *it;
+		if (unprocessedStations.find(stationId) != unprocessedStations.end()) {
+			unprocessedStations.erase(stationId);
+        }
+        else {
+			std::cerr << "方位角初始化异常！ " << endl;
+        }
+    }
+
+    // 检查是否所有测站都已处理, 若存在未处理的测站，表明可能存在后方交会观测，需进一步结合近似坐标处理
+    if (unprocessedStations.empty()) {
+        std::cout << "所有测站方位角初始化均已处理完成！" << endl;
+    }
+    else {
+
+        for (auto it = unprocessedStations.begin(); it != unprocessedStations.end(); ++it) {
+            std::string unprocessedStationId = it->first;
+            auto unprocessedStationObs = it->second;
+            for (const auto& obs : unprocessedStationObs.observations) {
+                if (obs.type == "方向观测") {
+                    std::string unprocessedPointId = obs.pointId;
+                    auto edge = manager.getEdge(unprocessedStationId, unprocessedPointId);
+                    if (!edge) {
+                        // 计算坐标差
+                        double dx = pointsCoord[unprocessedPointId].first - pointsCoord[unprocessedStationId].first;
+                        double dy = pointsCoord[unprocessedPointId].second - pointsCoord[unprocessedStationId].second;
+
+                        // 计算方位角
+                        double azimuth_rad = std::atan2(dy, dx);
+                        double azimuth_deg = azimuth_rad * 180.0 / M_PI;
+
+                        // 调整到0-360度范围
+                        if (azimuth_deg < 0) {
+                            azimuth_deg += 360.0;
+                        }
+
+                        // 添加边
+                        auto knownEdge = manager.addEdge(unprocessedStationId, unprocessedPointId, azimuth_deg, true);
+
+                    }
+                }
+            }
+        }
+
     }
 }
 
@@ -1010,8 +1059,7 @@ Eigen::VectorXd OrientatingLaunch::calVFin(){
 
 
 // 将平面坐标方位角转换为大地方位角以及天文方位角的模块
-void OrientatingLaunch::convertAzimuths(GeodeticAlgorithm algorithm) {
-    std::set<std::pair<std::string, std::string>> processedEdges;
+void OrientatingLaunch::convertAzimuths() {
 
     for (auto it = manager.begin(); it != manager.end(); ++it) {
         const auto& edgeKey = it->first;
@@ -1019,23 +1067,14 @@ void OrientatingLaunch::convertAzimuths(GeodeticAlgorithm algorithm) {
         const std::string& to = edgeKey.second;
         const auto reverseKey = std::make_pair(to, from);
 
-        // 跳过已处理的反向边
-        if (processedEdges.find(reverseKey) != processedEdges.end()) continue;
-        processedEdges.insert(edgeKey);
-
         DirectedEdge* edge = it->second;
         double originalAzimuth = edge->azimuth;
 
         // 平面坐标方位角转大地方位角
         double geodeticAzimuth = 0.0;
-        switch (algorithm) {
-        case GeodeticAlgorithm::Algorithm1:
-            geodeticAzimuth = convertToGeodeticAzimuth(originalAzimuth, algorithm);
-            break;
-        case GeodeticAlgorithm::Algorithm2:
-            geodeticAzimuth = convertToGeodeticAzimuth(originalAzimuth, algorithm);
-            break;
-        }
+
+        geodeticAzimuth = convertToGeodeticAzimuth(originalAzimuth);
+
 
         // 天文方位角转换判断
         if (hasAstronomicalInfo(edge)) {
@@ -1054,7 +1093,7 @@ bool OrientatingLaunch::hasAstronomicalInfo(const DirectedEdge* edge) const {
     return false;
 }
 
-double OrientatingLaunch::convertToGeodeticAzimuth(double planeAzimuth, GeodeticAlgorithm algorithm) const {
+double OrientatingLaunch::convertToGeodeticAzimuth(double planeAzimuth) const {
     // 待补充具体转换算法
     return planeAzimuth;
 }
@@ -1148,6 +1187,42 @@ bool OrientatingLaunch::processPartTapeValue(partTape& part) {
 bool OrientatingLaunch::calPartTapeValue(partTape& part) {
 
 
+
+    return true;
+}
+
+bool OrientatingLaunch::readPointsFromFile(const string& filePath) {
+    ifstream file(filePath);
+
+    if (!file.is_open()) {
+        throw runtime_error("无法打开文件: " + filePath);
+        return false;
+    }
+
+    string line;
+    while (getline(file, line)) {
+        vector<string> parts;
+        string part;
+        istringstream iss(line);
+
+        // 按逗号分割并去除空格
+        while (getline(iss, part, ',')) {
+            parts.push_back(trim(part));
+        }
+
+        if (parts.size() != 3) continue; // 跳过格式错误行
+
+        try {
+            string  id = parts[0];
+            double x = stod(parts[1]);
+            double y = stod(parts[2]);
+            pointsCoord[id] = make_pair(x, y);
+        }
+        catch (const exception&) {
+            // 跳过转换失败的行
+            continue;
+        }
+    }
 
     return true;
 }

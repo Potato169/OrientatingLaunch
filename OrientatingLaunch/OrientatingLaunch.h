@@ -25,6 +25,21 @@ struct AdjustmentResult {
     std::string Ri;
 };
 
+struct GeoAzimuth {
+    std::string from;
+    std::string to;
+    double azimuth;
+    std::string azimuth_dms;
+};
+
+struct StroAzimuth {
+    std::string from;
+    std::string to;
+    double azimuth;
+    std::string azimuth_dms;
+};
+
+
 class DebugLog {
 public:
     ~DebugLog() { std::clog << buffer.str() << std::endl; } // 自动换行
@@ -113,7 +128,10 @@ public:
     enum class GeodeticAlgorithm { Algorithm1, Algorithm2 };
 
 	// 转换函数主体
-    void convertAzimuths(GeodeticAlgorithm algorithm);
+    void convertAzimuths();
+
+    // 读取平差坐标，存储在knownPointsCoord中
+    bool readPointsFromFile(const std::string& filePath);
 
 
 private:
@@ -123,6 +141,8 @@ private:
     tapeFileReader& tapeReader;
 
     std::unordered_set<std::string> processedStations;
+    // 存储点的平差坐标
+    std::unordered_map<std::string, std::pair<double, double>> pointsCoord;
 
     Eigen::MatrixXd B;
     Eigen::VectorXd L;
@@ -150,6 +170,9 @@ private:
     std::vector<bool> isSumEquationRow; // 标记是否为和方程行
     int originalObsCounter = 0;     // 全局原始观测计数器
 
+    // 大地以及天文结果向量
+	std::vector<GeoAzimuth> geoAzimuthList;
+	std::vector<StroAzimuth> stroAzimuthList;
 
     void processKnownPoints();
     void processObservations();
@@ -187,7 +210,7 @@ private:
 	// 判断该边是否有对应天文信息
     bool hasAstronomicalInfo(const DirectedEdge* edge) const;
 	// 平面坐标方位角转换大地方位角
-    double convertToGeodeticAzimuth(double planeAzimuth, GeodeticAlgorithm algorithm) const;
+    double convertToGeodeticAzimuth(double planeAzimuth) const;
 	// 大地方位角转换天文方位角
     double convertToAstronomicalAzimuth(double geodeticAzimuth) const;
 
