@@ -34,8 +34,8 @@ public:
 	static void GaussForward(PointGauss& gauss, Ellipsoid::Ellipsoid_para ell);//高斯正算
 	static void GaussBack(PointGauss& gauss, Ellipsoid::Ellipsoid_para ell);//高斯反算
 	//天文方位角-大地方位角
-	static void caclAstroAngleByGeo(PointAz& pointAz);
-	static void caclGeoAngleByAstro(PointAz& pointAz);
+	static void caclAstroAngleToGeo(PointAz& pointAz);
+	static void caclGeoAngleToAstro(PointAz& pointAz);
 
 	//大地方位角-坐标方位角
 	static void caclCoordAngleByGeo(PointCoordAz& pointCoordAz);

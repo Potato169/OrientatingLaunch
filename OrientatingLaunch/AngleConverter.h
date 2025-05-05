@@ -14,7 +14,7 @@ public:
     // 度分秒转化为十进制
     static double parseAngleString(const std::string& angleStr);
     // 十进制转化为度分秒
-    static std::string formatAngleString(double degrees);
+    static std::string formatAngleString(double degrees, int decimalDigits = 4);
 
 private:
     static std::vector<std::string> split(const std::string& s, char delimiter);

@@ -321,7 +321,7 @@ void GeodeticCalculator::caclMeridianConvergenceAngle(PointMCA& mca, Ellipsoid::
 	mca.sigmaMCA = rad2deg(sqrt(dmca_dB * dmca_dB * sigmaB * sigmaB + dmca_dL * dmca_dL * sigmaL * sigmaL))/3600;
 }
 
-void GeodeticCalculator::caclAstroAngleByGeo(PointAz& pointAz)
+void GeodeticCalculator::caclAstroAngleToGeo(PointAz& pointAz)
 {
 	//地面
 	double alpha = deg2rad(pointAz.alpha), xi = deg2rad(pointAz.xi / 3600), eta = deg2rad(pointAz.eta / 3600), Z = deg2rad(pointAz.Z);
@@ -379,12 +379,22 @@ void GeodeticCalculator::caclAstroAngleByGeo(PointAz& pointAz)
 	pointAz.sigmaA_sea = rad2deg(sqrt(DA_SEA))*3600;
 }
 
-void GeodeticCalculator::caclGeoAngleByAstro(PointAz& pointAz)
+// 大地方位角转换天文方位角
+void GeodeticCalculator::caclGeoAngleToAstro(PointAz& pointAz)
 {
 	double A = deg2rad(pointAz.A), xi = deg2rad(pointAz.xi / 3600), eta = deg2rad(pointAz.eta / 3600), Z = deg2rad(pointAz.Z);
 	double L = deg2rad(pointAz.L), lamda = deg2rad(pointAz.lamda), fai = deg2rad(pointAz.fai);
+	double h2 = pointAz.H2 + pointAz.Zeta;
+
+	double dHfai = deg2rad(-0.000171 * pointAz.H1 * sin(2 * fai) / 3600);
+	double fai_sea = fai + dHfai;
+
 	double alpha = A + (lamda - L) * sin(fai) + (xi * sin(A) - eta * cos(A)) / tan(Z);
+	double dHalpha = deg2rad(-0.000108 * h2 * cos(fai_sea) * cos(fai_sea) * sin(2 * alpha) / 3600);
+	double alpha_sea = alpha + dHalpha;
+
 	pointAz.alpha = rad2deg(alpha);
+	pointAz.alpha_sea = rad2deg(alpha_sea);
 
 	double sigmaL = deg2rad(pointAz.sigmaL / 3600), sigmaLamda = deg2rad(pointAz.sigmaLamda / 3600), sigmaA = deg2rad(pointAz.sigmaA / 3600), sigmaFai = deg2rad(pointAz.sigmaFai / 3600);
 	double sigmaEta = deg2rad(pointAz.sigmaEta / 3600), sigmaXi = deg2rad(pointAz.sigmaXi / 3600), sigmaZ = deg2rad(pointAz.sigmaZ / 3600);

@@ -7,7 +7,6 @@
 #include "AngleConverter.h"
 
 int main() {
-
     In2FileReader reader;
     reader.readIn2File("D:/data/complex.in2");
 
@@ -19,7 +18,11 @@ int main() {
     EdgeManager manager;
 
     OrientatingLaunch launcher(manager, reader);
-    launcher.readPointsFromFile("D:/data/tapeCoord.txt");
+
+    launcher.readPlainPointsFromFile("D:/data/pointCoord.txt");
+    // 这里的read函数，同时初始化了这些点的天文经纬度与大地经纬度，
+    // 转换为大地方位角时用到的中央经线与椭球参数还有NF都设置为了默认值，
+    // 后续根据实际情况更改
     launcher.initializeEdges();
     manager.printEdges();
 
@@ -41,7 +44,9 @@ int main() {
         //    << AngleConverter::parseAngleString(res.V)
         //    << AngleConverter::parseAngleString(res.RESULT);
     }
-     
+    
+    launcher.convertAzimuths();
+
     launcher.processTapeData();
          
 

@@ -74,9 +74,9 @@ namespace CoordSystem
 		double x=0, y=0;
 		double sigmaX = 0, sigmaY = 0;
 		double sigmaB = 0, sigmaL = 0;
-		double L0 = 0;
-		int signeded = 0;
-		double mca = 0;//子午线收敛角
+		double L0 = 0; // 中央子午线
+		int signeded = 0; // 带号
+		double mca = 0;// 子午线收敛角
 		double sigmaMCA = 0;
 		double NF = 0;//北向偏移量
 		int width = 0;//投影带宽度

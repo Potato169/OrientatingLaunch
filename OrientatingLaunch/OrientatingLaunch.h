@@ -5,6 +5,7 @@
 #include "EdgeManager.h"
 #include "In2FileReader.h"
 #include "tapeFileReader.h"
+#include "CoordSystem.h"
 #include <Eigen/Dense>
 #include <vector>
 #include <queue>
@@ -25,19 +26,26 @@ struct AdjustmentResult {
     std::string Ri;
 };
 
-struct GeoAzimuth {
-    std::string from;
-    std::string to;
-    double azimuth;
-    std::string azimuth_dms;
+struct edgeAzimuth {
+    double geoAzimuth = -1.0;
+    std::string geoAzimuthDms;
+	double astroAzimuth = -1.0;
+	std::string astroAzimuthDms;
 };
 
-struct StroAzimuth {
-    std::string from;
-    std::string to;
-    double azimuth;
-    std::string azimuth_dms;
+struct pointCoord {
+	double x = 0.0;
+	double y = 0.0;
+	double BGeo = 0.0;
+	double LGeo = 0.0;
+    std::string BGeoDms;
+	std::string LGeoDms;
+	double BAstro = 0.0;
+	double LAstro = 0.0;
+	std::string BAstroDms;
+    std::string LAstroDms;
 };
+
 
 
 class DebugLog {
@@ -121,18 +129,38 @@ public:
     void printEdgeColumnMap();
 
 
-	//  由于上面的平差结果为平面坐标方位角
-    // 下面的模块用于将平面坐标方位角转换为天文方位角或大地方位角
-	// 算法选择枚举类型
-    // 方便在计算大地方位角的两种算法间切换，对比结果
-    enum class GeodeticAlgorithm { Algorithm1, Algorithm2 };
-
 	// 转换函数主体
     void convertAzimuths();
 
-    // 读取平差坐标，存储在knownPointsCoord中
-    bool readPointsFromFile(const std::string& filePath);
+    // 读取平差坐标，存储在knownPointsCoord中，并对平面坐标处理的到大地经纬度
+    bool readPlainPointsFromFile(const std::string& plainCoordFilePath);
 
+    // 读取已有的天文经纬度，将其他的点的天文经纬度通过归心计算得到
+    bool readAstroBLFromFile(const std::string& AstroBLFilePath);
+
+	// 大地与天文方位角转换的函数
+    void geoWstro();
+
+	// 平面方位角与大地方位角转换的函数
+    void coordWGeoAngle(CoordSystem::PointCoordAz& coordAz);
+
+    // 高斯反算(平面坐标到经纬度),参数分别对应平面坐标、带号以及带宽
+    CoordSystem::PointGauss gaussBack(double x, double y, int sign = 19, int width = 6);
+
+
+
+    // 自定义哈希函数
+    struct PairHash {
+        template <typename T1, typename T2>
+        std::size_t operator()(const std::pair<T1, T2>& p) const {
+            // 分别计算两个元素的哈希值
+            std::size_t hash1 = std::hash<T1>{}(p.first);
+            std::size_t hash2 = std::hash<T2>{}(p.second);
+
+            // 组合哈希值（避免简单异或导致的冲突）
+            return hash1 ^ (hash2 << 1);
+        }
+    };
 
 private:
     EdgeManager& manager;
@@ -141,8 +169,12 @@ private:
     tapeFileReader& tapeReader;
 
     std::unordered_set<std::string> processedStations;
-    // 存储点的平差坐标
-    std::unordered_map<std::string, std::pair<double, double>> pointsCoord;
+
+	// 存储点的坐标（近似？）、大地经纬、天文经纬
+    std::unordered_map<std::string, pointCoord> pointsInfo;
+
+	// 存储有向边的大地与天文方位角
+	std::unordered_map<std::pair<std::string, std::string>, edgeAzimuth, PairHash> geoAstroEdgeInfo;
 
     Eigen::MatrixXd B;
     Eigen::VectorXd L;
@@ -170,9 +202,8 @@ private:
     std::vector<bool> isSumEquationRow; // 标记是否为和方程行
     int originalObsCounter = 0;     // 全局原始观测计数器
 
-    // 大地以及天文结果向量
-	std::vector<GeoAzimuth> geoAzimuthList;
-	std::vector<StroAzimuth> stroAzimuthList;
+
+
 
     void processKnownPoints();
     void processObservations();

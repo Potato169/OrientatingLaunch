@@ -1,4 +1,4 @@
-
+#pragma once
 #include "OrientatingLaunch.h"
 #include "AngleConverter.h"
 #include <cmath>
@@ -15,6 +15,8 @@
 #include <limits>
 #include <Eigen/Dense>
 #include <string>
+#include "GeodeticCalculator.h" 
+#include "CoordSystem.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -202,8 +204,8 @@ void OrientatingLaunch::processObservations() {
                     auto edge = manager.getEdge(unprocessedStationId, unprocessedPointId);
                     if (!edge) {
                         // 计算坐标差
-                        double dx = pointsCoord[unprocessedPointId].first - pointsCoord[unprocessedStationId].first;
-                        double dy = pointsCoord[unprocessedPointId].second - pointsCoord[unprocessedStationId].second;
+                        double dx = pointsInfo[unprocessedPointId].x - pointsInfo[unprocessedStationId].x;
+                        double dy = pointsInfo[unprocessedPointId].y - pointsInfo[unprocessedStationId].y;
 
                         // 计算方位角
                         double azimuth_rad = std::atan2(dy, dx);
@@ -215,7 +217,7 @@ void OrientatingLaunch::processObservations() {
                         }
 
                         // 添加边
-                        auto knownEdge = manager.addEdge(unprocessedStationId, unprocessedPointId, azimuth_deg, true);
+                        auto knownEdge = manager.addEdge(unprocessedStationId, unprocessedPointId, azimuth_deg, false);
 
                     }
                 }
@@ -677,15 +679,15 @@ void OrientatingLaunch::buildMatrices() {
 
 	// 打印矩阵
     const Eigen::IOFormat fnt(1, 0, ", ", "\n", "", "");
-    cout << "B:\n" << B.format(fnt) << endl;
-    cout << "P:\n" << PMatrix.format(fnt) << endl;
+    //cout << "B:\n" << B.format(fnt) << endl;
+    //cout << "P:\n" << PMatrix.format(fnt) << endl;
 	const Eigen::IOFormat fmt(8, 0, ", ", "\n", "", "");	
-	cout << "L:\n" << L.format(fmt) << endl;	
-	cout << "W:\n" << W.format(fmt) << endl;
-	cout << "WTest:\n" << WTest.format(fmt) << endl;
+	//cout << "L:\n" << L.format(fmt) << endl;	
+	//cout << "W:\n" << W.format(fmt) << endl;
+	//cout << "WTest:\n" << WTest.format(fmt) << endl;
 
-    cout << "NBB:\n" << NBB.format(fmt) << endl;
-	cout << "NBBTest:\n" << NBBTest.format(fmt) << endl;
+ //   cout << "NBB:\n" << NBB.format(fmt) << endl;
+	//cout << "NBBTest:\n" << NBBTest.format(fmt) << endl;
 }
 
 void OrientatingLaunch::buildEdgeColumnMapping() {
@@ -855,7 +857,7 @@ void OrientatingLaunch::calculateCorrections() {
     cout << "x:\n" << x.format(fmt) << endl;
     // 计算协因数矩阵 Qx = NBB^{-1}
     Qx = NBB_inv;
-    cout << "Qx:\n" << Qx.format(fmt) << endl;
+    //cout << "Qx:\n" << Qx.format(fmt) << endl;
     // 计算观测值改正数 V = Bx - L
     V = B * x - L;
     cout << "V:\n" << V.format(fmt) << endl;
@@ -1071,19 +1073,22 @@ void OrientatingLaunch::convertAzimuths() {
         double originalAzimuth = edge->azimuth;
 
         // 平面坐标方位角转大地方位角
-        double geodeticAzimuth = 0.0;
+        double geoAzimuth = 0.0;
 
-        geodeticAzimuth = convertToGeodeticAzimuth(originalAzimuth);
+        PointCoordAz coordAz;
+		coordAz.p1.B = pointsInfo[from].BGeo;
+		coordAz.p1.L = pointsInfo[from].LGeo;
+		coordAz.p2.B = pointsInfo[to].BGeo;
+		coordAz.p2.L = pointsInfo[to].LGeo;
+        coordAz.alphaCoord = originalAzimuth;
 
 
-        // 天文方位角转换判断
-        if (hasAstronomicalInfo(edge)) {
-            double astronomicalAzimuth = convertToAstronomicalAzimuth(geodeticAzimuth);
-            edge->setAzimuth(astronomicalAzimuth);
-        }
-        else {
-            edge->setAzimuth(geodeticAzimuth);
-        }
+        coordWGeoAngle(coordAz);
+        //geoAzimuth = convertToGeodeticAzimuth(originalAzimuth);
+		geoAstroEdgeInfo[make_pair(from, to)].geoAzimuth = coordAz.A;
+		geoAstroEdgeInfo[make_pair(from, to)].geoAzimuthDms = AngleConverter::formatAngleString(coordAz.A);
+
+
     }
 }
 
@@ -1094,7 +1099,10 @@ bool OrientatingLaunch::hasAstronomicalInfo(const DirectedEdge* edge) const {
 }
 
 double OrientatingLaunch::convertToGeodeticAzimuth(double planeAzimuth) const {
-    // 待补充具体转换算法
+    
+
+
+
     return planeAzimuth;
 }
 
@@ -1121,8 +1129,6 @@ bool OrientatingLaunch::processTapeData() {
 
     return true;
 }
-
-
 
 bool OrientatingLaunch::processPartTapeValue(partTape& part) {
     string jzdId = part.JZId;
@@ -1191,11 +1197,12 @@ bool OrientatingLaunch::calPartTapeValue(partTape& part) {
     return true;
 }
 
-bool OrientatingLaunch::readPointsFromFile(const string& filePath) {
-    ifstream file(filePath);
+// 读取已知点平面坐标文件,这里同时将平面坐标进行了转化，获得了初始的大地经纬度以及天文方位角
+bool OrientatingLaunch::readPlainPointsFromFile(const string& plainCoordFilePath) {
+    ifstream file(plainCoordFilePath);
 
     if (!file.is_open()) {
-        throw runtime_error("无法打开文件: " + filePath);
+        throw runtime_error("无法打开文件: " + plainCoordFilePath);
         return false;
     }
 
@@ -1216,7 +1223,21 @@ bool OrientatingLaunch::readPointsFromFile(const string& filePath) {
             string  id = parts[0];
             double x = stod(parts[1]);
             double y = stod(parts[2]);
-            pointsCoord[id] = make_pair(x, y);
+			pointsInfo[id].x = x;
+			pointsInfo[id].y = y;
+
+			// 这里把平面坐标转化为大地经纬度，
+            // 默认使用bj54椭球参数，带号为19，带宽为6°
+            // 这里的椭球参数、中央经线、NF采用了默认值，实际需要读取参数，注意后期更改
+			PointGauss res = gaussBack(x, y);
+			pointsInfo[id].BGeo = res.B;
+			pointsInfo[id].LGeo = res.L;
+			pointsInfo[id].BGeoDms = AngleConverter::formatAngleString(res.B);
+			pointsInfo[id].LGeoDms = AngleConverter::formatAngleString(res.L);
+		}
+		catch (const invalid_argument&) {
+			// 跳过转换失败的行
+			continue;
         }
         catch (const exception&) {
             // 跳过转换失败的行
@@ -1225,4 +1246,150 @@ bool OrientatingLaunch::readPointsFromFile(const string& filePath) {
     }
 
     return true;
+}
+
+// 读取已知天文经纬度文件，同时将其他未知点的平面坐标进行归算得到所有点的天文经纬度
+bool readAstroBLFromFile(const std::string& AstroBLFilePath) {
+    ifstream file(AstroBLFilePath);
+
+    //if (!file.is_open()) {
+    //    throw runtime_error("无法打开文件: " + AstroBLFilePath);
+    //    return false;
+    //}
+
+    //string line;
+    //while (getline(file, line)) {
+    //    vector<string> parts;
+    //    string part;
+    //    istringstream iss(line);
+
+    //    // 按逗号分割并去除空格
+    //    while (getline(iss, part, ',')) {
+    //        parts.push_back(trim(part));
+    //    }
+
+    //    if (parts.size() != 3) continue; // 跳过格式错误行
+
+    //    try {
+    //        string  id = parts[0];
+    //        double x = stod(parts[1]);
+    //        double y = stod(parts[2]);
+    //        pointsInfo[id].x = x;
+    //        pointsInfo[id].y = y;
+
+    //        // 这里把平面坐标转化为大地经纬度，
+    //        // 默认使用bj54椭球参数，带号为19，带宽为6°
+    //        // 这里的椭球参数、中央经线、NF采用了默认值，实际需要读取参数，注意后期更改
+    //        PointGauss res = gaussBack(x, y);
+    //        pointsInfo[id].BGeo = res.B;
+    //        pointsInfo[id].LGeo = res.L;
+    //        pointsInfo[id].BGeoDms = degrees2dms(res.B);
+    //        pointsInfo[id].LGeoDms = degrees2dms(res.L);
+    //    }
+    //    catch (const invalid_argument&) {
+    //        // 跳过转换失败的行
+    //        continue;
+    //    }
+    //    catch (const exception&) {
+    //        // 跳过转换失败的行
+    //        continue;
+    //    }
+    //}
+
+    return true;
+
+}
+
+void OrientatingLaunch::geoWstro()
+{
+    //大地方位角与天文方位角的转换，函数接收PointAz结构体，
+    // 该结构体内需要填充 alpha地面天文方位角、x（垂线偏差子午分量）i、eta（垂线偏差东西分量）、Z（天顶距）、B（大地纬度）、L（大地经度）、lamda（天文经度）、fai（地面天文纬度），
+    // 如需计算海面天文方位角计算大地方位角，需要填充H1、H2（正常高）、Zeta（高程异常），如不填充，计算结果与使用地面天文方位角结果相同
+    //caclAstroAngleByGeo将大地方位角转为天文方位角,PointAz结构体的地面大地方位角A和sigmaA（标准差）；海面大地方位角A_sea和sigmaA_sea（标准差）；海面天文方位角alpha_sea;海面天文纬度fai_sea
+    // caclGeoAngleByAstro将天文方位角转为大地方位角将天文方位角转为大地方位角，PointAz结构体的天文方位角alpha和sigmaAlpha（标准差）将被填充
+    //结构体里的经纬度、天顶距单位为度，垂线偏差及标准差的单位为秒，高度、高程异常单位为米
+    PointAz pointAz;
+    pointAz.pointName = "PointA";
+    pointAz.alpha = 135.4685;
+    pointAz.xi = 7.2;
+    pointAz.eta = 3.4;
+    pointAz.Z = 42.5268;
+    pointAz.L = 102.7216;
+    pointAz.lamda = 102.7221;
+    pointAz.fai = 25.0396;
+    pointAz.sigmaAlpha = 1;
+
+    pointAz.H1 = 10;
+    pointAz.Zeta = 0;
+    pointAz.H2 = 21;
+    pointAz.sigmaH1 = 0.1;
+    GeodeticCalculator::caclAstroAngleToGeo(pointAz);
+    cout << "Point Name: " << pointAz.pointName << endl;
+    cout << "A: " << fixed << setprecision(10) << pointAz.A << " sigmaA: " << pointAz.sigmaA << endl;
+    cout << endl;
+    cout << "A_sea " << pointAz.A_sea << endl;
+    cout << "fai_sea " << pointAz.fai_sea << endl;
+    cout << "alpha_sea " << pointAz.alpha_sea << endl;
+
+    pointAz.alpha = 0;
+    GeodeticCalculator::caclGeoAngleToAstro(pointAz);
+    cout << "alpha: " << fixed << setprecision(10) << pointAz.alpha << endl;
+    cout << "sigmaAlpha: " << pointAz.sigmaAlpha << endl;
+
+}
+
+void OrientatingLaunch::coordWGeoAngle(CoordSystem::PointCoordAz &coordAz)
+{
+    //坐标方位角与大地方位角的转换，函数接收PointCoordAz结构体，
+    // 该结构体内包含两个gauss结构p1(起点)\p2（终点），需要填充B\L\L0（中央子午线），结构体内存储的值单位为度，标准差单位为秒
+    // 还包含大地方位角A和sigmaA（标准差），函数计算后向结构体内的坐标方位角alpha或大地方位角A进行填充
+    // caclCoordAngleByGeo将大地方位角转为坐标方位角，caclGeoAngleByCoord将坐标方位角转为大地方位角
+    // 默认椭球参数为bj54，若需要使用其他椭球参数，请修改结构体ell参数
+    //coordAz.p1.B = dms2degrees("22.145661630");
+    coordAz.p1.sigmaB = 0.1;
+    //coordAz.p1.L = dms2degrees("119.251490021");
+    coordAz.p1.L0 = dms2degrees("120");
+    //coordAz.p2.B = dms2degrees("22.582945240");
+    //coordAz.p2.L = dms2degrees("119.453851692");
+    coordAz.p2.L0 = dms2degrees("120");
+    //coordAz.A = dms2degrees("23.260222760");
+    coordAz.sigmaA = 0.1;
+    coordAz.ell = Ellipsoid::cgcs2000;
+
+
+    //GeodeticCalculator::caclCoordAngleByGeo(coordAz);
+    //cout << fixed << setprecision(15) << degrees2dms(coordAz.alphaCoord) << endl;
+    //cout << fixed << setprecision(15) << coordAz.sigmaAlphaCoord << endl;
+
+    GeodeticCalculator::caclGeoAngleByCoord(coordAz);
+    cout << fixed << setprecision(15) << degrees2dms(coordAz.A) << endl;
+    cout << fixed << setprecision(15) << coordAz.sigmaA << endl;
+
+
+}
+
+// 椭球参数：椭球长半轴、扁率
+
+CoordSystem::PointGauss OrientatingLaunch::gaussBack(double x, double y, int sign, int width)
+{
+    PointGauss gauss;
+    gauss.x = x;
+    gauss.y = y;
+	gauss.signeded = sign;
+    //gauss.L0 = 111;
+    gauss.width = width;// 6为6度带，3为3度带，0为自定应中央子午线，即指定L0进行计算
+    gauss.sigmaB = 1;
+    gauss.sigmaL = 1;
+    //GeodeticCalculator::GaussForward(gauss, Ellipsoid::bj54);
+    //cout << "6度带" << endl;
+    //cout << setprecision(15) << gauss.x << "  " << gauss.y << "  " << gauss.L0 << "  " << degrees2dms(gauss.mca) << " " << degrees2dms(gauss.sigmaMCA) << "  " << gauss.signeded << endl;
+    //cout << setprecision(15) << gauss.sigmaX << "  " << gauss.sigmaY << endl;
+
+    cout << endl << "高斯反算结果：" << endl;
+    // 实际得到椭球参数：长半轴、扁率
+    GeodeticCalculator::GaussBack(gauss, Ellipsoid::bj54);
+	cout << setprecision(15) << "  x：" << gauss.x << "  y：" << gauss.y  << "  " <<  " 带号： " << gauss.signeded << " 带宽： " << gauss.width << endl;
+    cout << setprecision(15) << "  B：" << degrees2dms(gauss.B) << " L： " << degrees2dms(gauss.L) << "  " << endl;
+
+	return gauss;
 }
