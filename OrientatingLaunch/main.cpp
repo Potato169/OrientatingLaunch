@@ -10,19 +10,22 @@ int main() {
     In2FileReader reader;
     reader.readIn2File("D:/data/complex.in2");
 
-	tapeFileReader tapeReader;
-    //tapeReader.readTapeFile("D:/data/sxbd_2.in2");
+	tapeFileReader tapeReader("D:/data/tapeFile.txt");
+    //tapeReader.readTapeFile();
 
 	std::cout << std::fixed << std::setprecision(8);
 
     EdgeManager manager;
 
-    OrientatingLaunch launcher(manager, reader);
+    OrientatingLaunch launcher(manager, reader, tapeReader);
 
     launcher.readPlainPointsFromFile("D:/data/pointCoord.txt");
     // 这里的read函数，同时初始化了这些点的天文经纬度与大地经纬度，
     // 转换为大地方位角时用到的中央经线与椭球参数还有NF都设置为了默认值，
     // 后续根据实际情况更改
+
+	launcher.readAstroBLFromFile("D:/data/数据库导出天文已知点.txt");
+    launcher.correct4Centering();
     launcher.initializeEdges();
     manager.printEdges();
 

@@ -2,12 +2,15 @@
 #include <string>
 #include <vector>
 #include <iostream>
-
+#include <fstream>
+#include <sstream>
 // 单个瞄准点的数据（暂定）
 struct mzdData {
 	std::string MzdId; // 瞄准点ID（含两端实测与中间未测瞄准点名称）
 	double tapeValue; // 瞄准点刻度值集合
-	double dirValue = 0.0; // 方向值集合，需要后续处理计算得到，单位默认为弧度
+	double dirValue = 0.0; // 方向值集合，需要后续处理计算得到，单位默认为角度
+	// 注意！这里的方向值不同于常规的方向值，虽然是从起始方向到终止方向的夹角，
+	// 但是范围在0-180度之间，逆时针或顺时针取决于两条边的空间关系
 	double distValue = 0.0; // 距离值集合，需要后续处理计算得到，单位默认为m
 	double fwValue = 0.0; // 方位角值集合，需要后续处理计算得到
 };
@@ -16,6 +19,7 @@ struct mzdData {
 struct partTape {
     std::string JZId; // 基准点ID
 	std::vector<mzdData> MzdData; // 中间点观测数据集合
+	double jzAngleByAzi = 0.0; // 由方位角计算的起始边到终止边的夹角 单位为度 范围0-180
 };
 
 
@@ -24,10 +28,11 @@ class tapeFileReader {
 public:
 	std::vector<partTape> TapeData;
 
-    tapeFileReader();
+	tapeFileReader();
+    tapeFileReader(const std::string& filePath);
     ~tapeFileReader();
 
-    bool readTapeFile(const std::string& filePath);
+	bool readTapeFile(const std::string& filePath);
 
     static tapeFileReader& getDefaultTapeReader() {
         static tapeFileReader defaultReader;
@@ -69,9 +74,7 @@ private:
     
 
 
-    std::string detectAndConvertEncoding(const std::vector<char>& data);
-    std::string convertEncoding(const char* from, const char* to, const std::string& input);
-    bool isValidUTF8(const std::string& str) const;
+
     static std::vector<std::string> splitString(const std::string& str, char delimiter);
     // 字符串处理辅助函数
     static std::string trim(const std::string& s);

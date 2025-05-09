@@ -22,6 +22,11 @@
 #define M_PI 3.14159265358979323846
 #endif 
 
+#ifndef RAD_TO_ARCSEC
+#define RAD_TO_ARCSEC 206264.806
+#endif // !RAD_TO_ARCSEC
+
+
 using namespace std;
 
 // 定义极小值 epsilon
@@ -75,6 +80,7 @@ OrientatingLaunch::OrientatingLaunch(EdgeManager& manager,
     const In2FileReader& reader, tapeFileReader& tapeReader)
     : manager(manager), reader(reader), tapeReader(tapeReader) {
     sigma0 = reader.getAccuracyValues()[0].directionPrecision;
+    std::cout << "存在标尺数据，载入数据"
 }
 
 
@@ -1073,7 +1079,6 @@ void OrientatingLaunch::convertAzimuths() {
         double originalAzimuth = edge->azimuth;
 
         // 平面坐标方位角转大地方位角
-        double geoAzimuth = 0.0;
 
         PointCoordAz coordAz;
 		coordAz.p1.B = pointsInfo[from].BGeo;
@@ -1084,32 +1089,34 @@ void OrientatingLaunch::convertAzimuths() {
 
 
         coordWGeoAngle(coordAz);
-        //geoAzimuth = convertToGeodeticAzimuth(originalAzimuth);
-		geoAstroEdgeInfo[make_pair(from, to)].geoAzimuth = coordAz.A;
-		geoAstroEdgeInfo[make_pair(from, to)].geoAzimuthDms = AngleConverter::formatAngleString(coordAz.A);
+		geoAstroEdgeInfo[edgeKey].geoAzimuth = coordAz.A;
+		geoAstroEdgeInfo[edgeKey].geoAzimuthDms = AngleConverter::formatAngleString(coordAz.A);
 
+        //大地方位角转换为天文方位角
+        PointAz pointAz;
+        pointAz.pointName = from;
+		pointAz.A = coordAz.A; // 大地方位角
+		pointAz.xi = pointsInfo[from].BAstro - pointsInfo[from].BGeo; // 垂线偏差南北分量
+        pointAz.eta = (pointsInfo[from].LAstro - pointsInfo[from].LGeo) * cos(pointsInfo[from].BAstro * M_PI / 180.0); // 垂线偏差东西分量
+        pointAz.Z = 42.5268; // 天顶距 （用高程计算，高程文件获取）
+        pointAz.L = pointsInfo[from].LGeo; // 大地经度 
+        pointAz.lamda = pointsInfo[from].LAstro; // 地面天文经度 
+        pointAz.fai = pointsInfo[from].BAstro;  // 地面天文纬度
+		pointAz.sigmaAlpha = 1; // 方位角精度
 
+        pointAz.H1 = 10; // 起点正常高（高程文件获取）
+        pointAz.Zeta = 0; // 高程异常 (可以取值为0（忽略不计））
+        pointAz.H2 = 21; // 终点正常高（高程文件获取）
+        pointAz.sigmaH1 = 0.1;
+
+        GeodeticCalculator::caclGeoAngleToAstro(pointAz);
+		geoAstroEdgeInfo[edgeKey].astroAzimuth = pointAz.alpha_sea;
+		geoAstroEdgeInfo[edgeKey].astroAzimuthDms = AngleConverter::formatAngleString(pointAz.alpha_sea);
     }
+
+
 }
 
-// 辅助函数占位实现（待补充）
-bool OrientatingLaunch::hasAstronomicalInfo(const DirectedEdge* edge) const {
-    // 待补充天文方位角判断条件
-    return false;
-}
-
-double OrientatingLaunch::convertToGeodeticAzimuth(double planeAzimuth) const {
-    
-
-
-
-    return planeAzimuth;
-}
-
-double OrientatingLaunch::convertToAstronomicalAzimuth(double geodeticAzimuth) const {
-    // 待补充天文方位角转换算法
-    return geodeticAzimuth;
-}
 
 // 标尺数据处理模块
 bool OrientatingLaunch::processTapeData() {
@@ -1133,59 +1140,96 @@ bool OrientatingLaunch::processTapeData() {
 bool OrientatingLaunch::processPartTapeValue(partTape& part) {
     string jzdId = part.JZId;
 	string firstMzdId = part.MzdData[0].MzdId;
-	string finalMzdId = part.MzdData[part.MzdData.size() - 1].MzdId;
+	int finMzdIndex = part.MzdData.size() - 1;
+	string finalMzdId = part.MzdData[finMzdIndex].MzdId;
 
 	// 先将两个观测瞄准点的方位角初始化，使用平差之后的方位角，在manager对象中检索
 	DirectedEdge* firstMzdEdge = manager.getEdge(jzdId, firstMzdId);
 	DirectedEdge* finalMzdEdge = manager.getEdge(jzdId, finalMzdId);
-    if (!firstMzdEdge) {
+    if (!firstMzdEdge || !finalMzdEdge) {
 		throw std::invalid_argument("Invalid edge variation when initializing part tape");
 		return false;
     }
     else {
 		part.MzdData[0].fwValue = firstMzdEdge->azimuth;
-		part.MzdData[part.MzdData.size() - 1].fwValue = finalMzdEdge->azimuth;
+		part.MzdData[finMzdIndex].fwValue = finalMzdEdge->azimuth;
     }
 
-	// 然后遍历观测值找到距离观测值
-    for (const auto& stationData : reader.getObservations()) {
-		string stationId = trim(stationData.stationId);
-        if (stationId != jzdId) continue;
-		for (const auto& obs : stationData.observations) {
-			if (obs.type == "距离观测") {
-                string targetId = trim(obs.pointId);
-                if (targetId == firstMzdId) {
-                    part.MzdData[0].distValue = stod(obs.value);
-                }
-                else if (targetId == finalMzdId) {
-                    part.MzdData[part.MzdData.size() - 1].distValue = stod(obs.value);
-                }
+	// 计算起始于终止边的平面距离
 
-			}
-		}
-    }
+    part.MzdData[0].distValue = sqrt(pow((pointsInfo[firstMzdId].x - pointsInfo[jzdId].x), 2)
+        + pow((pointsInfo[firstMzdId].y - pointsInfo[jzdId].y), 2));
+       
+	part.MzdData[finMzdIndex].distValue = sqrt(pow((pointsInfo[finalMzdId].x - pointsInfo[jzdId].x), 2)
+		+ pow((pointsInfo[finalMzdId].y - pointsInfo[jzdId].y), 2));
 
-	// 计算从起始方向到终止方向的方向值，范围在0-360之间
+    // 用两个变量存
+	double distJz2MzdFst = part.MzdData[0].distValue;
+	double distJz2MzdFin = part.MzdData[finMzdIndex].distValue;
+
+
+	// 计算从起始方向到终止方向的方向值，范围在0-360之间()
 	double absDeltaFw = fmod(
-		part.MzdData[part.MzdData.size() - 1].fwValue -
+		part.MzdData[finMzdIndex].fwValue -
 		part.MzdData[0].fwValue + 360.0, 360.0);
 
-	// 将较差归算到0到180之间
+
+    // 计算起始边到终止边的夹角，这里的角度的范围必然是0-180之间，存到变量vertexAngle
     if (absDeltaFw >= 360.0 || absDeltaFw < 0.0) {
 		cerr << "方向值超出范围！" << endl;
     }
-	// 当方向值大于180时，更换起始方向，从终止方向起算处理数据
     else if (absDeltaFw > 180.0) {
-		absDeltaFw = 360.0 - absDeltaFw;
-
-
-	}else if (absDeltaFw < -180.0) {
-		
+        part.jzAngleByAzi = 360.0 - absDeltaFw;
+	}else {
+        part.jzAngleByAzi = absDeltaFw;
 	}
     
-    // 
+    // 由余弦定理计算基准点顶点角
+    double distMzdFst2MzdFin = part.MzdData[finMzdIndex].tapeValue - part.MzdData[0].tapeValue;
+	// 这里的vertexAngleByCos仅仅是顶点角的余弦值，还需要进一步计算
+	double jzAngleByCos = (pow(distJz2MzdFst, 2) + pow(distJz2MzdFin, 2) - pow(distMzdFst2MzdFin, 2))
+        / (2 * distJz2MzdFst * distJz2MzdFin);
+    // 判断输入合法性
+    if (jzAngleByCos < -1.0 || jzAngleByCos > 1.0) {
+        std::cerr << "Error: Input must be in [-1, 1]." << std::endl;
+        return 1;
+    }
+	jzAngleByCos = acos(jzAngleByCos) * 180.0 / M_PI; // 弧度转化为角度
+    // 计算闭合差，用于后续的平差
+	double closingError = part.jzAngleByAzi - jzAngleByCos; // 闭合差
+    part.MzdData[finMzdIndex].dirValue = jzAngleByCos + closingError; // 模拟平差的过程
 
+	// 计算起始边对应顶点的夹角的余弦值
+	double cosMzdFstAngle = (pow(distJz2MzdFst, 2) + pow(distMzdFst2MzdFin, 2) - pow(distJz2MzdFin, 2)) 
+        / (2 * distJz2MzdFst * distMzdFst2MzdFin);
+    // 判断结果合理性
+    if (cosMzdFstAngle < -1.0 || cosMzdFstAngle > 1.0) {
+        std::cerr << "Error: Input must be in [-1, 1]." << std::endl;
+        return 1;
+    }
+    
+    // 计算剩余瞄准点的方向值
+    for (int curMzdIndex = 1; curMzdIndex < finMzdIndex; curMzdIndex++) {
+        // 刻度边的长度
+        double distMzdFst2MzdCur = part.MzdData[curMzdIndex].tapeValue - part.MzdData[0].tapeValue;
 
+        // 计算基准点到当前瞄准点的距离
+        double distJzd2MzdCur = pow(distJz2MzdFst, 2) + pow(distMzdFst2MzdCur, 2)
+            - (2 * distJz2MzdFst * distMzdFst2MzdCur * cosMzdFstAngle);
+        distJzd2MzdCur = sqrt(distJzd2MzdCur);
+        part.MzdData[curMzdIndex].distValue = distJzd2MzdCur;
+
+        // 计算当前瞄准点的方向值
+		double MzdCurAngle = (pow(distJz2MzdFst, 2) + pow(distJzd2MzdCur, 2) - pow(distMzdFst2MzdCur, 2))
+			/ (2 * distJz2MzdFst * distJzd2MzdCur);
+		// 判断输入合法性
+		if (MzdCurAngle < -1.0 || MzdCurAngle > 1.0) {
+			std::cerr << "Error: Input must be in [-1, 1]." << std::endl;
+			return 1;
+		}
+		MzdCurAngle = acos(MzdCurAngle) * 180.0 / M_PI; // 弧度转化为角度
+		part.MzdData[curMzdIndex].dirValue = MzdCurAngle + closingError / 2.0;
+    }
 
     return true;
 }
@@ -1197,7 +1241,7 @@ bool OrientatingLaunch::calPartTapeValue(partTape& part) {
     return true;
 }
 
-// 读取已知点平面坐标文件,这里同时将平面坐标进行了转化，获得了初始的大地经纬度以及天文方位角
+// 读取已知点平面坐标文件,这里同时将平面坐标进行了转化，获得了初始的大地经纬度
 bool OrientatingLaunch::readPlainPointsFromFile(const string& plainCoordFilePath) {
     ifstream file(plainCoordFilePath);
 
@@ -1234,6 +1278,9 @@ bool OrientatingLaunch::readPlainPointsFromFile(const string& plainCoordFilePath
 			pointsInfo[id].LGeo = res.L;
 			pointsInfo[id].BGeoDms = AngleConverter::formatAngleString(res.B);
 			pointsInfo[id].LGeoDms = AngleConverter::formatAngleString(res.L);
+            double& M = pointsInfo[id].M;
+			double& N = pointsInfo[id].N;
+			calMN(res.B, pointsInfo[id].ell, M, N);
 		}
 		catch (const invalid_argument&) {
 			// 跳过转换失败的行
@@ -1249,55 +1296,111 @@ bool OrientatingLaunch::readPlainPointsFromFile(const string& plainCoordFilePath
 }
 
 // 读取已知天文经纬度文件，同时将其他未知点的平面坐标进行归算得到所有点的天文经纬度
-bool readAstroBLFromFile(const std::string& AstroBLFilePath) {
+bool OrientatingLaunch::readAstroBLFromFile(const std::string& AstroBLFilePath) {
     ifstream file(AstroBLFilePath);
 
-    //if (!file.is_open()) {
-    //    throw runtime_error("无法打开文件: " + AstroBLFilePath);
-    //    return false;
-    //}
+    if (!file.is_open()) {
+        throw runtime_error("无法打开文件: " + AstroBLFilePath);
+        return false;
+    }
 
-    //string line;
-    //while (getline(file, line)) {
-    //    vector<string> parts;
-    //    string part;
-    //    istringstream iss(line);
+    string line;
+    while (getline(file, line)) {
+        vector<string> parts;
+        string part;
+        istringstream iss(line);
 
-    //    // 按逗号分割并去除空格
-    //    while (getline(iss, part, ',')) {
-    //        parts.push_back(trim(part));
-    //    }
+        // 按逗号分割并去除空格
+        while (getline(iss, part, ',')) {
+            parts.push_back(trim(part));
+        }
 
-    //    if (parts.size() != 3) continue; // 跳过格式错误行
+        if (parts.size() != 3) continue; // 跳过格式错误行
 
-    //    try {
-    //        string  id = parts[0];
-    //        double x = stod(parts[1]);
-    //        double y = stod(parts[2]);
-    //        pointsInfo[id].x = x;
-    //        pointsInfo[id].y = y;
+        try {
+            string id = parts[0];
+            string BAs = parts[1];
+            string LAs = parts[2];
+            pointsInfo[id].BAstroDms = BAs;
+            pointsInfo[id].LAstroDms = LAs;
+            pointsInfo[id].BAstro = AngleConverter::parseAngleString(BAs);
+            pointsInfo[id].LAstro = AngleConverter::parseAngleString(LAs);
+        }
+        catch (const invalid_argument&) {
+            // 跳过转换失败的行
+            continue;
+        }
+        catch (const exception&) {
+            // 跳过转换失败的行
+            continue;
+        }
+    }
 
-    //        // 这里把平面坐标转化为大地经纬度，
-    //        // 默认使用bj54椭球参数，带号为19，带宽为6°
-    //        // 这里的椭球参数、中央经线、NF采用了默认值，实际需要读取参数，注意后期更改
-    //        PointGauss res = gaussBack(x, y);
-    //        pointsInfo[id].BGeo = res.B;
-    //        pointsInfo[id].LGeo = res.L;
-    //        pointsInfo[id].BGeoDms = degrees2dms(res.B);
-    //        pointsInfo[id].LGeoDms = degrees2dms(res.L);
-    //    }
-    //    catch (const invalid_argument&) {
-    //        // 跳过转换失败的行
-    //        continue;
-    //    }
-    //    catch (const exception&) {
-    //        // 跳过转换失败的行
-    //        continue;
-    //    }
-    //}
+
 
     return true;
 
+}
+
+// 归心改正
+bool OrientatingLaunch::correct4Centering() {
+    bool ifFindRefStation = false;
+
+    // 下面是用于归心转换的参考站的基本信息
+    double fai0 = 0.0;
+	double fai0_rad = 0.0;
+	double lambda0 = 0.0;
+	double lambda0_rad = 0.0;
+	// 遍历所有点，找到第一个符合条件的参考站
+	std::string refStationId;
+    const pointCoord* refStation = nullptr;
+
+    for (const auto& entry : pointsInfo) {
+        const std::string& key = entry.first;
+        const pointCoord& coord = entry.second;
+        if (coord.BAstro != 361.0 || coord.LAstro != 361.0) {
+            ifFindRefStation = true;
+            fai0 = coord.BAstro;
+			fai0_rad = fai0 * M_PI / 180.0;
+			lambda0 = coord.LAstro;
+			lambda0_rad = lambda0 * M_PI / 180.0;
+			refStationId = key;
+			refStation = &coord;
+            break;
+		}
+    }
+	if (!ifFindRefStation) {
+		cerr << "没有找到归心转换的参考站，请检查已知天文经纬度文件的正确性！" << endl;
+		return false;
+	}
+
+	double e = 0.0; // 两点间的距离
+    double alpha = 0.0; // 两点大地方位角
+    double alpha_rad = 0.0;
+    for (auto& entry : pointsInfo) {
+        const std::string& key = entry.first;
+        pointCoord& coord = entry.second;
+        if (coord.BAstro == 361.0 && coord.LAstro == 361.0) {
+            PointGeoSolution pointGeoSolution;
+			pointGeoSolution.B1 = refStation->BGeo;
+			pointGeoSolution.L1 = refStation->LGeo;
+			pointGeoSolution.B2 = coord.BGeo;
+			pointGeoSolution.L2 = coord.LGeo;
+
+            GeodeticCalculator::GeodeticSlutionBack_Bessel(pointGeoSolution, refStation->ell);
+            e = pointGeoSolution.S;
+            alpha = pointGeoSolution.A1;
+			alpha_rad = alpha * M_PI / 180.0;
+
+			coord.BAstro = fai0 + RAD_TO_ARCSEC * (e * cos(alpha_rad) / refStation->M)/3600;
+			coord.LAstro = lambda0 + RAD_TO_ARCSEC * (e * sin(alpha_rad) / (refStation->N * cos(fai0_rad)))/3600;
+			coord.BAstroDms = AngleConverter::formatAngleString(coord.BAstro);
+			coord.LAstroDms = AngleConverter::formatAngleString(coord.LAstro);
+        }
+    }
+
+
+	return true;
 }
 
 void OrientatingLaunch::geoWstro()
@@ -1392,4 +1495,18 @@ CoordSystem::PointGauss OrientatingLaunch::gaussBack(double x, double y, int sig
     cout << setprecision(15) << "  B：" << degrees2dms(gauss.B) << " L： " << degrees2dms(gauss.L) << "  " << endl;
 
 	return gauss;
+}
+
+
+void OrientatingLaunch::calMN(const double& B, const CoordSystem::Ellipsoid::Ellipsoid_para& ell, double& M, double& N) {
+    double a = ell.a;
+    double f = ell.f;
+    double b = a * (1 - f);
+    double c = a * (a / b);
+    double e1 = sqrt((a / b) * (a / b) - 1.0);
+    double B1 = deg2rad(B);
+    double n = e1 * cos(B1);
+    double V = sqrt(1 + n * n);
+    M = c / (V * V * V);
+    N = c / V;
 }

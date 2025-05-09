@@ -150,6 +150,22 @@ namespace CoordSystem
 		PointCoordAz(PointGauss p1, PointGauss p2, Ellipsoid::Ellipsoid_para ell)
 			:p1(p1), p2(p2), ell(ell){};
 	};
-	
+	struct PointGeoSolution
+	{
+		string PointName1 = "";
+		string PointName2 = "";
+		double B1 = 0, L1 = 0;
+		double B2 = 0, L2 = 0;
+		double A1 = 0, A2 = 0;
+		double S = 0;
+		PointGeoSolution() {};
+		PointGeoSolution(double B1, double L1, double B2, double L2, double A1, double A2, double S)
+			:B1(B1), L1(L1), B2(B2), L2(L2), A1(A1), A2(A2), S(S) {
+		};
+		PointGeoSolution(string PointName, double B1, double L1, double B2, double L2, double A1, double A2, double S)
+			:PointName1(PointName1), B1(B1), L1(L1), B2(B2), L2(L2), A1(A1), A2(A2), S(S) {
+		};
+
+	};
 }
 #endif

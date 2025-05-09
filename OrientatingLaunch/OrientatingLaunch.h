@@ -40,10 +40,16 @@ struct pointCoord {
 	double LGeo = 0.0;
     std::string BGeoDms;
 	std::string LGeoDms;
-	double BAstro = 0.0;
-	double LAstro = 0.0;
+	double BAstro = 361.0; // 这里默认值为361.0，表示未初始化
+	double LAstro = 361.0;
 	std::string BAstroDms;
     std::string LAstroDms;
+	CoordSystem::Ellipsoid::Ellipsoid_para ell = CoordSystem::Ellipsoid::bj54;
+	double NF = 0.0; 
+    double M = 0.0; // 子午圈曲率半径
+	double N = 0.0; // 卯酉圈曲率半径
+	double L0 = 0.0; // 中央子午线
+
 };
 
 
@@ -138,6 +144,9 @@ public:
     // 读取已有的天文经纬度，将其他的点的天文经纬度通过归心计算得到
     bool readAstroBLFromFile(const std::string& AstroBLFilePath);
 
+    // 归心改正
+    bool correct4Centering();
+
 	// 大地与天文方位角转换的函数
     void geoWstro();
 
@@ -149,7 +158,7 @@ public:
 
 
 
-    // 自定义哈希函数
+    // geoAstroEdgeInfo自定义哈希函数
     struct PairHash {
         template <typename T1, typename T2>
         std::size_t operator()(const std::pair<T1, T2>& p) const {
@@ -170,7 +179,7 @@ private:
 
     std::unordered_set<std::string> processedStations;
 
-	// 存储点的坐标（近似？）、大地经纬、天文经纬
+	// 存储点的坐标（近似？）、大地经纬、天文经纬、NF、中央经线、卯酉圈、子午圈曲率半径、椭球参数
     std::unordered_map<std::string, pointCoord> pointsInfo;
 
 	// 存储有向边的大地与天文方位角
@@ -249,6 +258,10 @@ private:
     // 初始化方位角
     bool processPartTapeValue(partTape& part);
     bool calPartTapeValue(partTape& part);
+
+
+    // 由椭球参数ell以及大地纬度B计算M、N（子午圈曲率半径以及卯酉圈曲率半径）
+	void calMN(const double& B, const CoordSystem::Ellipsoid::Ellipsoid_para& ell, double& M, double& N);
 
 };
 

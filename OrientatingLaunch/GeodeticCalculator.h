@@ -40,6 +40,9 @@ public:
 	//大地方位角-坐标方位角
 	static void caclCoordAngleByGeo(PointCoordAz& pointCoordAz);
 	static void caclGeoAngleByCoord(PointCoordAz& pointCoordAz);
+
+	static void GeodeticSlutionBack_Bessel(PointGeoSolution& geo, Ellipsoid::Ellipsoid_para ell);
+
 };
 
 #endif

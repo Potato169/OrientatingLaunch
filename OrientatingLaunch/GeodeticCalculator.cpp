@@ -346,14 +346,14 @@ void GeodeticCalculator::caclAstroAngleToGeo(PointAz& pointAz)
 	double sigmaL = deg2rad(pointAz.sigmaL / 3600), sigmaLamda = deg2rad(pointAz.sigmaLamda / 3600), sigmaAlpha = deg2rad(pointAz.sigmaAlpha / 3600), sigmaFai = deg2rad(pointAz.sigmaFai / 3600);
 	double sigmaEta = deg2rad(pointAz.sigmaEta / 3600), sigmaXi = deg2rad(pointAz.sigmaXi / 3600), sigmaZ = deg2rad(pointAz.sigmaZ / 3600);
 	double DA = (sigmaL * sigmaL) * pow(sin(fai), 2.0) + (sigmaLamda * sigmaLamda) * pow(sin(fai), 2.0) + sigmaAlpha * sigmaAlpha + (sigmaFai * sigmaFai) * pow(cos(fai), 2.0) * pow(L - lamda, 2.0) + (sigmaEta * sigmaEta) * pow(cos(A), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaXi * sigmaXi) * pow(sin(A), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaZ * sigmaZ) * 1.0 / pow(tan(Z), 4.0) * pow(eta * cos(A) - xi * sin(A), 2.0) * pow(pow(tan(Z), 2.0) + 1.0, 2.0);
-	pointAz.sigmaA = rad2deg(sqrt(DA))*3600;
+	pointAz.sigmaA = rad2deg(sqrt(DA)) * 3600;
 
 	//海
 	double dHfai = deg2rad(-0.000171 * pointAz.H1 * sin(2 * fai) / 3600);
 	double fai_sea = fai + dHfai;
 	pointAz.fai_sea = rad2deg(fai_sea);
 	double h2 = pointAz.H2 + pointAz.Zeta;
-	double dHalpha = deg2rad(- 0.000108 * h2 * cos(fai) * cos(fai) * sin(2 * alpha) / 3600);
+	double dHalpha = deg2rad(-0.000108 * h2 * cos(fai_sea) * cos(fai_sea) * sin(2 * alpha) / 3600);
 	double alpha_sea = alpha + dHalpha;
 	pointAz.alpha_sea = rad2deg(alpha_sea);
 
@@ -375,8 +375,8 @@ void GeodeticCalculator::caclAstroAngleToGeo(PointAz& pointAz)
 
 	double H1 = pointAz.H1, H2 = pointAz.H2, Zeta = pointAz.Zeta;
 	double sigmaH1 = (pointAz.sigmaH1), sigmaH2 = (pointAz.sigmaH2), sigmaZeta = (pointAz.sigmaZeta);
-	double DA_SEA=(sigmaAlpha * sigmaAlpha)* pow(cos(alpha * 2.0) * pow(cos(fai), 2.0) * (H2 * 1.08E-4 + Zeta * 1.08E-4) * 2.0 - 1.0, 2.0) + (sigmaFai * sigmaFai) * pow(cos(fai - H1 * sin(fai * 2.0) * 1.71E-4) * (H1 * cos(fai * 2.0) * 3.42E-4 - 1.0) * (L - lamda) - sin(alpha * 2.0) * cos(fai) * sin(fai) * (H2 * 1.08E-4 + Zeta * 1.08E-4) * 2.0, 2.0) + (sigmaL * sigmaL) * pow(sin(fai - H1 * sin(fai * 2.0) * 1.71E-4), 2.0) + (sigmaLamda * sigmaLamda) * pow(sin(fai - H1 * sin(fai * 2.0) * 1.71E-4), 2.0) + (sigmaEta * sigmaEta) * pow(cos(A_sea), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaXi * sigmaXi) * pow(sin(A_sea), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaH2 * sigmaH2) * pow(sin(alpha * 2.0), 2.0) * pow(cos(fai), 4.0) * 1.1664E-8 + (sigmaZeta * sigmaZeta) * pow(sin(alpha * 2.0), 2.0) * pow(cos(fai), 4.0) * 1.1664E-8 + (sigmaZ * sigmaZ) * 1.0 / pow(tan(Z), 4.0) * pow(eta * cos(A_sea) - xi * sin(A_sea), 2.0) * pow(pow(tan(Z), 2.0) + 1.0, 2.0) + (sigmaH1 * sigmaH1) * pow(sin(fai * 2.0), 2.0) * pow(cos(fai - H1 * sin(fai * 2.0) * 1.71E-4), 2.0) * pow(L - lamda, 2.0) * 2.9241E-8;
-	pointAz.sigmaA_sea = rad2deg(sqrt(DA_SEA))*3600;
+	double DA_SEA = (sigmaAlpha * sigmaAlpha) * pow(cos(alpha * 2.0) * pow(cos(fai), 2.0) * (H2 * 1.08E-4 + Zeta * 1.08E-4) * 2.0 - 1.0, 2.0) + (sigmaFai * sigmaFai) * pow(cos(fai - H1 * sin(fai * 2.0) * 1.71E-4) * (H1 * cos(fai * 2.0) * 3.42E-4 - 1.0) * (L - lamda) - sin(alpha * 2.0) * cos(fai) * sin(fai) * (H2 * 1.08E-4 + Zeta * 1.08E-4) * 2.0, 2.0) + (sigmaL * sigmaL) * pow(sin(fai - H1 * sin(fai * 2.0) * 1.71E-4), 2.0) + (sigmaLamda * sigmaLamda) * pow(sin(fai - H1 * sin(fai * 2.0) * 1.71E-4), 2.0) + (sigmaEta * sigmaEta) * pow(cos(A_sea), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaXi * sigmaXi) * pow(sin(A_sea), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaH2 * sigmaH2) * pow(sin(alpha * 2.0), 2.0) * pow(cos(fai), 4.0) * 1.1664E-8 + (sigmaZeta * sigmaZeta) * pow(sin(alpha * 2.0), 2.0) * pow(cos(fai), 4.0) * 1.1664E-8 + (sigmaZ * sigmaZ) * 1.0 / pow(tan(Z), 4.0) * pow(eta * cos(A_sea) - xi * sin(A_sea), 2.0) * pow(pow(tan(Z), 2.0) + 1.0, 2.0) + (sigmaH1 * sigmaH1) * pow(sin(fai * 2.0), 2.0) * pow(cos(fai - H1 * sin(fai * 2.0) * 1.71E-4), 2.0) * pow(L - lamda, 2.0) * 2.9241E-8;
+	pointAz.sigmaA_sea = rad2deg(sqrt(DA_SEA)) * 3600;
 }
 
 // 大地方位角转换天文方位角
@@ -401,7 +401,6 @@ void GeodeticCalculator::caclGeoAngleToAstro(PointAz& pointAz)
 	double Dalpha = (sigmaL * sigmaL) * pow(sin(fai), 2.0) + (sigmaLamda * sigmaLamda) * pow(sin(fai), 2.0) + (sigmaA * sigmaA) * pow((eta * sin(A) + xi * cos(A)) / tan(Z) + 1.0, 2.0) + (sigmaFai * sigmaFai) * pow(cos(fai), 2.0) * pow(L - lamda, 2.0) + (sigmaEta * sigmaEta) * pow(cos(A), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaXi * sigmaXi) * pow(sin(A), 2.0) * 1.0 / pow(tan(Z), 2.0) + (sigmaZ * sigmaZ) * 1.0 / pow(tan(Z), 4.0) * pow(eta * cos(A) - xi * sin(A), 2.0) * pow(pow(tan(Z), 2.0) + 1.0, 2.0);
 	pointAz.sigmaAlpha = rad2deg(sqrt(Dalpha)) * 3600;
 }
-
 
 void GeodeticCalculator::caclCoordAngleByGeo(PointCoordAz& pointCoordAz)
 {
@@ -481,3 +480,83 @@ void GeodeticCalculator::caclGeoAngleByCoord(PointCoordAz& pointCoordAz)
 
 }
 
+void GeodeticCalculator::GeodeticSlutionBack_Bessel(PointGeoSolution& geo, Ellipsoid::Ellipsoid_para ell)
+{
+	double B1 = geo.B1, L1 = geo.L1, B2 = geo.B2, L2 = geo.L2;
+	double a = ell.a, f = ell.f;
+	B1 = deg2rad(B1); L1 = deg2rad(L1);
+	B2 = deg2rad(B2); L2 = deg2rad(L2);
+	double b = a * (1 - f);
+	double e1 = sqrt(a * a - b * b) / a;
+	double e2 = sqrt(a * a - b * b) / b;
+	double p0 = 206265.0;
+	double W1 = sqrt(1 - e1 * e1 * sin(B1) * sin(B1));
+	double W2 = sqrt(1 - e1 * e1 * sin(B2) * sin(B2));
+	double U1 = atan(sqrt(1 - e1 * e1) * tan(B1));
+	double U2 = atan(sqrt(1 - e1 * e1) * tan(B2));
+	double l = L2 - L1;
+	double a1 = sin(U1) * sin(U2);
+	double a2 = cos(U1) * cos(U2);
+	double b1 = cos(U1) * sin(U2);
+	double b2 = sin(U1) * cos(U2);
+	double lambda = l;
+	double Dlambda = 1;
+	double lambda0, p, q, A1, sinsig, cossig, sigma, sinA0, sigma1, cosA0, alpha1, beta1, gamma1, xx, kp2, kp4;
+	double e4 = pow(e1, 4);
+	double e6 = pow(e1, 6);
+	while (Dlambda > 1e-30)
+	{
+		lambda0 = lambda;
+		p = cos(U2) * sin(lambda0);
+		q = b1 - b2 * cos(lambda0);
+		A1 = abs(atan(p / q));
+		if (p > 0 && q > 0) {}
+		if (p > 0 && q < 0)
+			A1 = pi - A1;
+		if (p < 0 && q < 0)
+			A1 = pi + A1;
+		if (p < 0 && q>0)
+			A1 = 2.0 * pi - A1;
+		sinsig = p * sin(A1) + q * cos(A1);
+		cossig = a1 + a2 * cos(lambda0);
+		sigma = abs(atan(sinsig / cossig));
+		if (cossig > 0) {}
+		if (cossig < 0)
+			sigma = pi - sigma;
+		sinA0 = cos(U1) * sin(A1);
+		sigma1 = atan(tan(U1) * (1 / cos(A1)));
+		cosA0 = sqrt(1 - sinA0 * sinA0);
+		kp2 = e1 * e1 * cosA0 * cosA0;
+		kp4 = kp2 * kp2;
+		alpha1 = (e1 * e1 / 2.0 + e4 / 8.0 + e6 / 16.0) - e1 * e1 * (1 + e1 * e1) * kp2 / 16.0 + 3.0 * kp4 * e1 * e1 / 128.0;
+		beta1 = e1 * e1 * (1.0 + e1 * e1) * kp2 / 16.0 - e1 * e1 * kp4 / 32.0;
+		gamma1 = e1 * e1 * kp4 / 256;
+		xx = alpha1 * sigma + beta1 * sin(sigma) * cos(2 * sigma1 + sigma);
+		xx = xx + gamma1 * sin(2.0 * sigma) * cos(4.0 * sigma1 + 2.0 * sigma);
+		lambda = l + sinA0 * xx;
+		Dlambda = abs(lambda - lambda0) * p0;
+	}
+	double k2, k4, k6, alpha, beta, gamma, x, S, sinA2, cosA2, tanA2, A2, sinA1;
+	k2 = e2 * e2 * cosA0 * cosA0; k4 = k2 * k2; k6 = k2 * k2 * k2;
+	alpha = (1.0 - k2 / 4.0 + 7.0 * k4 / 64.0 - 15.0 * k6 / 256.0) / b;
+	beta = k2 / 4.0 - k4 / 8 + 37 * k6 / 512.0;
+	gamma = k4 / 128.0 - k6 / 128.0;
+	x = 2.0 * a1 - cosA0 * cosA0 * cossig;
+	S = gamma * sin(2.0 * sigma) * cos(4.0 * sigma1 + 2.0 * sigma);
+	S = (sigma - beta * sin(sigma) * cos(2.0 * sigma1 + sigma) - S) / alpha;
+	sinA2 = cos(U1) * sin(A1);
+	cosA2 = cos(U1) * cos(sigma) * cos(A1) - sin(U1) * sin(sigma);
+	tanA2 = sinA2 / cosA2;
+	A2 = abs(atan(tanA2));
+	sinA1 = sin(A1);
+	if (sinA1 < 0 && tanA2>0) {}
+	if (sinA1 < 0 && tanA2 < 0)
+		A2 = pi - A2;
+	if (sinA1 > 0 && tanA2 > 0)
+		A2 = pi + A2;
+	if (sinA1 > 0 && tanA2 < 0)
+		A2 = 2 * pi - A2;
+	geo.A1 = rad2deg(A1);
+	geo.A2 = rad2deg(A2);
+	geo.S = S;
+}
