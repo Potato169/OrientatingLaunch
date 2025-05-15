@@ -135,6 +135,12 @@ public:
     void printEdgeColumnMap();
 
 
+    // 字符串处理辅助函数
+    static std::string trim(const std::string& s);
+    static bool startsWith(const std::string& s, const std::string& prefix);
+    static std::vector<std::string> split(const std::string& s, const std::string& delimiter);
+    std::string doubleToString(const double value, int precision = 8);
+
 	// 转换函数主体
     void convertAzimuths();
 
@@ -156,7 +162,8 @@ public:
     // 高斯反算(平面坐标到经纬度),参数分别对应平面坐标、带号以及带宽
     CoordSystem::PointGauss gaussBack(double x, double y, int sign = 19, int width = 6);
 
-
+    // 打印标尺方位角值（这里打印的是平面方位角）
+    void printTapeFwValue();
 
     // geoAstroEdgeInfo自定义哈希函数
     struct PairHash {
@@ -182,7 +189,7 @@ private:
 	// 存储点的坐标（近似？）、大地经纬、天文经纬、NF、中央经线、卯酉圈、子午圈曲率半径、椭球参数
     std::unordered_map<std::string, pointCoord> pointsInfo;
 
-	// 存储有向边的大地与天文方位角
+	// 存储有向边的大地与天文方位角(包含标尺方位角)
 	std::unordered_map<std::pair<std::string, std::string>, edgeAzimuth, PairHash> geoAstroEdgeInfo;
 
     Eigen::MatrixXd B;
@@ -236,11 +243,7 @@ private:
     void calculateAccuracyParameters();
     void generateResultList();
 
-    // 字符串处理辅助函数
-    static std::string trim(const std::string& s);
-    static bool startsWith(const std::string& s, const std::string& prefix);
-    static std::vector<std::string> split(const std::string& s, const std::string& delimiter);
-    std::string doubleToString(const double value, int precision = 8);
+
 
 	Eigen::VectorXd calVNoSum();// 这里得到的V剔除了和方程改正
     Eigen::VectorXd calVFin();// 这里在VNoSum的基础之上添加了没有参与平差的观测值改正
@@ -257,7 +260,7 @@ private:
 	// 标尺数据处理辅助函数
     // 初始化方位角
     bool processPartTapeValue(partTape& part);
-    bool calPartTapeValue(partTape& part);
+    bool convertPartTapeValue(partTape& part);
 
 
     // 由椭球参数ell以及大地纬度B计算M、N（子午圈曲率半径以及卯酉圈曲率半径）

@@ -10,8 +10,8 @@
 #include <sstream>
 #include <regex>
 #include <stdexcept>
-#include "iconv.h"
-#pragma comment(lib,"libiconv.lib")
+//#include "iconv.h"
+//#pragma comment(lib,"libiconv.lib")
 
 namespace Ui {
     // 存储精度值
@@ -59,12 +59,15 @@ private:
     std::vector<Ui::KnownPoint> knownPoints;
     std::vector<Ui::ObservationData> observations;
 
-    std::string detectAndConvertEncoding(const std::vector<char>& data);
-    std::string convertEncoding(const char* from, const char* to, const std::string& input);
-    bool isValidUTF8(const std::string& str) const;
-    static std::vector<std::string> splitString(const std::string& str, char delimiter);
+    //std::string detectAndConvertEncoding(const std::vector<char>& data);
+    //std::string convertEncoding(const char* from, const char* to, const std::string& input);
+    //bool isValidUTF8(const std::string& str) const;
+
     // 字符串处理辅助函数
     static std::string trim(const std::string& s);
+    static void replaceChineseComma(std::string& input);
+    std::string removeUTF8BOM(const std::vector<char>& data);
+    static std::vector<std::string> splitString(const std::string& str, char delimiter);
 };
 
 #endif // IN2FILEREADER_H

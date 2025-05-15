@@ -1,0 +1,4 @@
+当起算数据没有已知方位角，而是只有已知点坐标是，OrientatingLaunch::processObservations中是默认已知边为两条名称固定的已知边
+    edgeQueue.push({ "TWD1", "FWD1" });
+    edgeQueue.push({ "TWD2", "FWD2" });
+该部分需要后期根据情况修改

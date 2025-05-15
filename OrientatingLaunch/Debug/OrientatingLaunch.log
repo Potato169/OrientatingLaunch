@@ -1,0 +1,22 @@
+﻿  OrientatingLaunch.cpp
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(308,46): warning C4101: “e”: 未引用的局部变量
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(329,42): warning C4101: “e”: 未引用的局部变量
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(533,61): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(576,39): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(577,43): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(584,39): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(626,27): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(627,31): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(634,27): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(647,23): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(648,27): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(655,20): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(662,23): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(666,27): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(673,20): warning C4018: “<”: 有符号/无符号不匹配
+D:\project\OrientatingLaunch\OrientatingLaunch\OrientatingLaunch.cpp(1021,23): warning C4018: “<”: 有符号/无符号不匹配
+  tapeFileReader.cpp
+  正在生成代码...
+  OrientatingLaunch.vcxproj -> D:\project\OrientatingLaunch\Debug\OrientatingLaunch.exe
+  'pwsh.exe' 不是内部或外部命令，也不是可运行的程序
+  或批处理文件。
