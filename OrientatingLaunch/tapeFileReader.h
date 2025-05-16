@@ -33,28 +33,30 @@ struct partTape {
 	double jzAngleByAzi = 0.0; // 由方位角计算的起始边到终止边的夹角 单位为度 范围0-180
 };
 
-struct allTape {
-	std::string JZId; // 基准点ID
-	std::string FSId; // 发射点ID
-	std::vector<singleTape> allTapeData; // 所有标尺数据集合
-};
-
-struct singleTape {
-	std::string tapeId; // 标尺ID
-	std::vector<std::string> markId; // 标尺刻度ID集合
-	std::vector<double> markValue ; // 标尺刻度值集合(平差后确定)
-	std::vector<distObs> distObsData; // 标尺观测值集合
-};
-
 struct distObs {
 	std::string from; // 起始点ID
 	std::string to; // 终止点ID
 	double distObaValue; // 距离值
 };
 
+struct singleTape {
+	std::string tapeId; // 标尺ID
+	std::vector<std::string> markId; // 标尺刻度ID集合
+	std::vector<double> markValue; // 标尺刻度值集合(平差后确定)
+	std::vector<distObs> distObsData; // 标尺观测值集合
+};
+
+struct allTape {
+	std::string JZId; // 基准点ID
+	std::string FSId; // 发射点ID
+	std::vector<singleTape> allTapeData; // 所有标尺数据集合
+};
+
 class tapeFileReader {
 public:
 	std::vector<partTape> TapeData;
+
+	allTape tapeFileData; // 标尺文件数据
 
 	tapeFileReader();
     tapeFileReader(const std::string& filePath);
@@ -64,7 +66,7 @@ public:
 	bool readTapeFile(const std::string& filePath);
 
 	// 读取标尺文件（新版本）
-	bool readTapeFileNew(const std::string& filePath);
+	bool readTapeFileNew(const std::string& filename);
 
     static tapeFileReader& getDefaultTapeReader() {
         static tapeFileReader defaultReader;
@@ -110,4 +112,7 @@ private:
 	bool isTapeLine(const std::string& s) {
 		return s.find("标尺") == 0;
 	}
+
+	// 辅助函数：读取整个文件到UTF-8字符串
+	std::string readFileAsUTF8(const std::string& filename);
 };

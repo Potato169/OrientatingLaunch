@@ -1,10 +1,17 @@
 #pragma once
 #include "tapeFileReader.h"
-
+#include <codecvt>
+#include <locale>
 
 tapeFileReader::tapeFileReader() = default;
 tapeFileReader::tapeFileReader(const std::string& filePath) {
-    readTapeFile(filePath);
+
+	if (!readTapeFileNew(filePath)) {
+		std::cerr << "读取标尺文件失败！" << std::endl;
+	}
+	else {
+		std::cout << "读取标尺文件成功！" << std::endl;
+	}
 }
 tapeFileReader::~tapeFileReader() = default;
 
@@ -81,6 +88,96 @@ bool tapeFileReader::readTapeFile(const std::string& filePath) {
 
 }
 
+// 读取文件（新版本）
+bool tapeFileReader::readTapeFileNew(const std::string& filename) {
+    std::ifstream inFile(filename);
+    if (!inFile.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+        return false;
+    }
+
+    // 读取第一行（发射点和基准点ID）
+    std::string line;
+    if (!std::getline(inFile, line)) {
+        std::cerr << "Error: Empty file." << std::endl;
+        return false;
+    }
+    auto firstLine = splitString(line, ',');
+    if (firstLine.size() != 2) {
+        std::cerr << "Error: First line must contain exactly two IDs." << std::endl;
+        return false;
+    }
+    tapeFileData.FSId = firstLine[0];
+    tapeFileData.JZId = firstLine[1];
+
+    singleTape currentTape;
+    bool processingTape = false;
+
+    while (std::getline(inFile, line)) {
+        // 跳过空行
+        if (line.empty()) continue;
+
+        // 检查标尺ID行（例如"标尺1"）
+        if (line.find("标尺") == 0) {
+            if (processingTape) {
+                // 保存当前标尺
+                m_allTape.allTapeData.push_back(currentTape);
+                currentTape = singleTape();
+            }
+            currentTape.tapeId = line;
+            processingTape = true;
+
+            // 读取刻度ID行
+            std::string markLine;
+            while (std::getline(inFile, markLine)) {
+                if (!markLine.empty()) break;
+            }
+            if (markLine.empty()) {
+                std::cerr << "Error: Missing mark IDs for tape " << currentTape.tapeId << std::endl;
+                return false;
+            }
+            currentTape.markId = split(markLine, ',');
+            if (currentTape.markId.empty()) {
+                std::cerr << "Error: No valid mark IDs for tape " << currentTape.tapeId << std::endl;
+                return false;
+            }
+        }
+        else {
+            if (!processingTape) {
+                std::cerr << "Error: Data outside of tape section: " << line << std::endl;
+                return false;
+            }
+            // 处理距离观测数据
+            auto parts = split(line, ',');
+            if (parts.size() != 3) {
+                std::cerr << "Error: Invalid observation format: " << line << std::endl;
+                return false;
+            }
+            distObs obs;
+            obs.from = parts[0];
+            obs.to = parts[1];
+            try {
+                obs.distObaValue = std::stod(parts[2]);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Error: Invalid distance value in line: " << line << std::endl;
+                return false;
+            }
+            currentTape.distObsData.push_back(obs);
+        }
+    }
+
+    // 保存最后一个标尺
+    if (processingTape) {
+        m_allTape.allTapeData.push_back(currentTape);
+    }
+
+    return true;
+    
+
+}
+
+
 // 辅助函数：去除字符串首尾空白
 std::string tapeFileReader::trim(const std::string& s) {
     auto start = s.begin();
@@ -103,5 +200,27 @@ std::vector<std::string> tapeFileReader::splitString(const std::string& s, char 
         tokens.push_back(trim(token));
     }
     return tokens;
+}
+
+// 辅助函数：读取整个文件到UTF-8字符串
+std::string tapeFileReader::readFileAsUTF8(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Cannot open file");
+    }
+
+    // 读取二进制数据
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string contents = buffer.str();
+
+    // 若文件含BOM头（Windows常见），跳过前3字节
+    if (contents.size() >= 3 &&
+        (uint8_t)contents[0] == 0xEF &&
+        (uint8_t)contents[1] == 0xBB &&
+        (uint8_t)contents[2] == 0xBF) {
+        contents = contents.substr(3);
+    }
+    return contents;
 }
 
