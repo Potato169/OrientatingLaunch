@@ -80,7 +80,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LibraryPath>D:\project\OrientatingLaunch\OrientatingLaunch;$(LibraryPath)</LibraryPath>
-    <IncludePath>D:\CPackage\eigen-3.3.8;$(IncludePath)</IncludePath>
+    <IncludePath>D:\CPackage\eigen-3.3.8;$(SolutionDir)eigen-3.4.0;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>D:\project\OrientatingLaunch\OrientatingLaunch;$(LibraryPath)</LibraryPath>
@@ -176,6 +176,9 @@
     <ClInclude Include="In2FileReader.h" />
     <ClInclude Include="OrientatingLaunch.h" />
     <ClInclude Include="tapeFileReader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\x64\Debug\tapeFileNew.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

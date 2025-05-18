@@ -1120,7 +1120,7 @@ void OrientatingLaunch::convertAzimuths() {
 
 // 标尺数据处理模块
 bool OrientatingLaunch::processTapeData() {
-    
+    distObsAdjustment();
 
     for (partTape& part : tapeReader.TapeData) {
         if (!processPartTapeValue(part)) {
@@ -1136,8 +1136,6 @@ bool OrientatingLaunch::processTapeData() {
 
     return true;
 }
-
-
 
 bool OrientatingLaunch::processPartTapeValue(partTape& part) {
     string jzdId = part.JZId;
@@ -1440,6 +1438,103 @@ bool OrientatingLaunch::convertPartTapeValue(partTape& part) {
     }
 
     return true;
+}
+
+// 标尺读数平差（单尺）
+bool OrientatingLaunch::adjustSingleTape(singleTape& tape) {
+    const auto& marks = tape.markId;
+    const size_t numMarks = marks.size();
+    if (numMarks <= 1) return false;
+
+    // 构建ID到索引的有序映射（关键改进）
+    std::unordered_map<std::string, size_t> idToIndex;
+    for (size_t i = 0; i < marks.size(); ++i) {
+        idToIndex[marks[i]] = i; // 索引即刻度顺序
+    }
+
+    const size_t numParams = numMarks - 1; // 参数数量
+    const size_t numObs = tape.distObsData.size();
+
+    // 第一阶段：直接求解近似值 -------------------------------------------
+    MatrixXd A0(numObs, numParams);
+    VectorXd L0(numObs);
+
+    // 构建初始观测方程（X_to - X_from = dist）
+    for (size_t i = 0; i < numObs; ++i) {
+        const auto& obs = tape.distObsData[i];
+        size_t fromIdx = idToIndex.at(obs.from);
+        size_t toIdx = idToIndex.at(obs.to);
+
+        A0.row(i).setZero();
+        if (fromIdx > 0) A0(i, fromIdx - 1) = -1.0;
+        if (toIdx > 0)   A0(i, toIdx - 1) = 1.0;
+
+        L0(i) = obs.distObsValue;
+    }
+    std::cout << "A0:" << A0 << std::endl;
+    // 最小二乘求解初始近似值
+    VectorXd X0 = A0.jacobiSvd(ComputeThinU | ComputeThinV).solve(L0);
+	std::cout << "初始X0近似值: " << X0 << std::endl;
+    std::cout << "L0: " << L0 << std::endl;
+    // 第二阶段：迭代平差 -------------------------------------------------
+    const int maxIter = 2; // 迭代2次即可收敛
+    VectorXd X = X0;
+
+    for (int iter = 0; iter < maxIter; ++iter) {
+        // 构建误差方程 B*dx = l - V
+        MatrixXd B(numObs, numParams);
+        VectorXd l(numObs);
+
+        for (size_t i = 0; i < numObs; ++i) {
+            const auto& obs = tape.distObsData[i];
+            size_t fromIdx = idToIndex.at(obs.from);
+            size_t toIdx = idToIndex.at(obs.to);
+
+            // 计算当前近似值的距离
+            double approxDist = (toIdx == 0 ? 0.0 : X(toIdx - 1))
+                - (fromIdx == 0 ? 0.0 : X(fromIdx - 1));
+
+            // 闭合差 = 观测值 - 近似值计算值
+            l(i) = obs.distObsValue - approxDist;
+
+            // 设计矩阵保持不变
+            B.row(i).setZero();
+            if (fromIdx > 0) B(i, fromIdx - 1) = -1.0;
+            if (toIdx > 0)   B(i, toIdx - 1) = 1.0;
+        }
+
+        // 解改正数
+        VectorXd dx = B.jacobiSvd(ComputeThinU | ComputeThinV).solve(l);
+        std::cout << "改正结果: " << dx << std::endl;
+        X += dx; // 更新参数
+    }
+
+    // 写入最终结果
+    tape.markValue.resize(numMarks);
+    tape.markValue[0] = 0.0;
+    for (size_t i = 1; i < numMarks; ++i) {
+        tape.markValue[i] = X(i - 1);
+    }
+	std::cout << "最终平差结果: " << X << std::endl;
+    return true;
+}
+// 标尺读数平差
+bool OrientatingLaunch::distObsAdjustment() {
+    
+    for (singleTape& tape : tapeReader.tapeFileData.allTapeData) {
+        adjustSingleTape(tape);
+    }
+
+
+    return true;
+}
+
+// 辅助函数：获取刻度点索引
+size_t OrientatingLaunch::getMarkIndex(const std::vector<std::string>& marks, const std::string& id) {
+    for (size_t i = 0; i < marks.size(); ++i) {
+        if (marks[i] == id) return i;
+    }
+    throw std::runtime_error("Invalid mark ID: " + id);
 }
 
 // 读取已知点平面坐标文件,这里同时将平面坐标进行了转化，获得了初始的大地经纬度

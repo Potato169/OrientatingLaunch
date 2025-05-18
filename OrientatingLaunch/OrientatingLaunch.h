@@ -250,18 +250,27 @@ private:
 
 
 	// 平面坐标方位角转换天文方位角模块的辅助函数
-	// 判断该边是否有对应天文信息
-    bool hasAstronomicalInfo(const DirectedEdge* edge) const;
-	// 平面坐标方位角转换大地方位角
-    double convertToGeodeticAzimuth(double planeAzimuth) const;
-	// 大地方位角转换天文方位角
-    double convertToAstronomicalAzimuth(double geodeticAzimuth) const;
+ //   bool hasAstronomicalInfo(const DirectedEdge* edge) const;
+	//// 平面坐标方位角转换大地方位角
+ //   double convertToGeodeticAzimuth(double planeAzimuth) const;
+	//// 大地方位角转换天文方位角
+ //   double convertToAstronomicalAzimuth(double geodeticAzimuth) const;
 
 	// 标尺数据处理辅助函数
     // 初始化方位角
     bool processPartTapeValue(partTape& part);
     bool convertPartTapeValue(partTape& part);
 
+    // 标尺距离测量值平差
+    bool distObsAdjustment();
+    // 标尺读数平差
+    bool adjustSingleTape(singleTape& tape);
+    // 标尺平差辅助函数
+    // 辅助函数：获取刻度点索引
+    size_t getMarkIndex(const std::vector<std::string>& marks, const std::string& id);
+    // 辅助函数：Dijkstra算法计算近似值
+    std::vector<double> calcApproxValues(const std::vector<std::string>& marks,
+        const std::vector<distObs>& obs);
 
     // 由椭球参数ell以及大地纬度B计算M、N（子午圈曲率半径以及卯酉圈曲率半径）
 	void calMN(const double& B, const CoordSystem::Ellipsoid::Ellipsoid_para& ell, double& M, double& N);

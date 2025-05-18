@@ -36,13 +36,13 @@ struct partTape {
 struct distObs {
 	std::string from; // 起始点ID
 	std::string to; // 终止点ID
-	double distObaValue; // 距离值
+	double distObsValue; // 距离值
 };
 
 struct singleTape {
 	std::string tapeId; // 标尺ID
 	std::vector<std::string> markId; // 标尺刻度ID集合
-	std::vector<double> markValue; // 标尺刻度值集合(平差后确定)
+	std::vector<double> markValue; // 标尺刻度值集合,与ID一一对应(平差后确定)
 	std::vector<distObs> distObsData; // 标尺观测值集合
 };
 

@@ -3,6 +3,7 @@
 #include <codecvt>
 #include <locale>
 
+
 tapeFileReader::tapeFileReader() = default;
 tapeFileReader::tapeFileReader(const std::string& filePath) {
 
@@ -12,6 +13,9 @@ tapeFileReader::tapeFileReader(const std::string& filePath) {
 	else {
 		std::cout << "读取标尺文件成功！" << std::endl;
 	}
+
+
+
 }
 tapeFileReader::~tapeFileReader() = default;
 
@@ -118,10 +122,10 @@ bool tapeFileReader::readTapeFileNew(const std::string& filename) {
         if (line.empty()) continue;
 
         // 检查标尺ID行（例如"标尺1"）
-        if (line.find("标尺") == 0) {
+        if (line.find("tape") == 0) {
             if (processingTape) {
                 // 保存当前标尺
-                m_allTape.allTapeData.push_back(currentTape);
+                tapeFileData.allTapeData.push_back(currentTape);
                 currentTape = singleTape();
             }
             currentTape.tapeId = line;
@@ -133,10 +137,10 @@ bool tapeFileReader::readTapeFileNew(const std::string& filename) {
                 if (!markLine.empty()) break;
             }
             if (markLine.empty()) {
-                std::cerr << "Error: Missing mark IDs for tape " << currentTape.tapeId << std::endl;
+               std::cerr << "Error: Missing mark IDs for tape " << currentTape.tapeId << std::endl;
                 return false;
             }
-            currentTape.markId = split(markLine, ',');
+            currentTape.markId = splitString(markLine, ',');
             if (currentTape.markId.empty()) {
                 std::cerr << "Error: No valid mark IDs for tape " << currentTape.tapeId << std::endl;
                 return false;
@@ -148,16 +152,18 @@ bool tapeFileReader::readTapeFileNew(const std::string& filename) {
                 return false;
             }
             // 处理距离观测数据
-            auto parts = split(line, ',');
+            auto parts = splitString(line, ',');
             if (parts.size() != 3) {
                 std::cerr << "Error: Invalid observation format: " << line << std::endl;
                 return false;
             }
             distObs obs;
-            obs.from = parts[0];
-            obs.to = parts[1];
+            auto it1 = std::find(currentTape.markId.begin(), currentTape.markId.end(), parts[0]);
+			auto it2 = std::find(currentTape.markId.begin(), currentTape.markId.end(), parts[1]);
+			obs.from = it1 < it2 ? parts[0] : parts[1];
+			obs.to = it1 < it2 ? parts[1] : parts[0];
             try {
-                obs.distObaValue = std::stod(parts[2]);
+                obs.distObsValue = std::stod(parts[2]);
             }
             catch (const std::exception& e) {
                 std::cerr << "Error: Invalid distance value in line: " << line << std::endl;
@@ -169,7 +175,7 @@ bool tapeFileReader::readTapeFileNew(const std::string& filename) {
 
     // 保存最后一个标尺
     if (processingTape) {
-        m_allTape.allTapeData.push_back(currentTape);
+        tapeFileData.allTapeData.push_back(currentTape);
     }
 
     return true;
