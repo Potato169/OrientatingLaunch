@@ -8,10 +8,10 @@
 struct mzdData {
 	std::string MzdId; // 瞄准点ID（含两端实测与中间未测瞄准点名称）
 	double tapeValue; // 瞄准点刻度值集合
-	double dirValue = -1.0; // 方向值集合，需要后续处理计算得到，单位默认为角度
+	double dirValue = 0.0; // 方向值集合，需要后续处理计算得到，单位默认为角度
 	// 注意！这里的方向值不同于常规的方向值，虽然是从起始方向到终止方向的夹角，
 	// 但是范围在0-180度之间，逆时针或顺时针取决于两条边的空间关系
-	double distValue = -1.0; // 距离值集合，需要后续处理计算得到，单位默认为m
+	double distValue = 0.0; // 距离值集合，需要后续处理计算得到，单位默认为m
 	double fwValue = 361.0; // 方位角值集合，需要后续处理计算得到（坐标方位角, 单位度）
 	std::string fwValueDms; // 方位角值集合（度分秒格式）
 	double reverseFwValue = 361.0; // 反方位角值集合，需要后续处理计算得到（坐标方位角）
@@ -28,7 +28,7 @@ struct mzdData {
 
 // 两个实测瞄准点间的观测数据（暂定）
 struct partTape {
-    std::string JZId; // 基准点ID
+    std::string JZorFSId; // 基准/发射点ID
 	std::vector<mzdData> MzdData; // 中间点观测数据集合
 	double jzAngleByAzi = 0.0; // 由方位角计算的起始边到终止边的夹角 单位为度 范围0-180
 };
@@ -52,8 +52,14 @@ struct allTape {
 	std::vector<singleTape> allTapeData; // 所有标尺数据集合
 };
 
+
+
 class tapeFileReader {
 public:
+	// 用来判断是否读入了标尺数据，未读入数据时
+	// 若读入数据则变为false
+	static bool isDefaultTapeFile;
+
 	std::vector<partTape> TapeData;
 
 	allTape tapeFileData; // 标尺文件数据
@@ -69,10 +75,11 @@ public:
 	bool readTapeFileNew(const std::string& filename);
 
     static tapeFileReader& getDefaultTapeReader() {
+		isDefaultTapeFile = true; 
         static tapeFileReader defaultReader;
 
         partTape testTape;
-		testTape.JZId = "JZD0";
+		testTape.JZorFSId = "JZD0";
 		mzdData testMzd1, testMzd2, testMzd3, testMzd4, testMzd5, testMzd6;
 		testMzd1.MzdId = "MZD1";
 		testMzd1.tapeValue = 0.0;
@@ -96,7 +103,7 @@ public:
 		testTape.MzdData.push_back(testMzd5);
 		testTape.MzdData.push_back(testMzd6);
 
-		std::cout << "程序未读入标尺数据，使用测试标尺数据进行测试" << std::endl;
+		std::cout << "未读入标尺数据" << std::endl;
 
 		defaultReader.TapeData.push_back(testTape);
 
@@ -116,3 +123,4 @@ private:
 	// 辅助函数：读取整个文件到UTF-8字符串
 	std::string readFileAsUTF8(const std::string& filename);
 };
+

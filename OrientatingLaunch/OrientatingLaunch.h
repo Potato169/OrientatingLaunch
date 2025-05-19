@@ -162,9 +162,6 @@ public:
     // 高斯反算(平面坐标到经纬度),参数分别对应平面坐标、带号以及带宽
     CoordSystem::PointGauss gaussBack(double x, double y, int sign = 19, int width = 6);
 
-    // 打印标尺方位角值（这里打印的是平面方位角）
-    void printTapeFwValue();
-
     // geoAstroEdgeInfo自定义哈希函数
     struct PairHash {
         template <typename T1, typename T2>
@@ -268,9 +265,12 @@ private:
     // 标尺平差辅助函数
     // 辅助函数：获取刻度点索引
     size_t getMarkIndex(const std::vector<std::string>& marks, const std::string& id);
-    // 辅助函数：Dijkstra算法计算近似值
-    std::vector<double> calcApproxValues(const std::vector<std::string>& marks,
-        const std::vector<distObs>& obs);
+    // 将标尺的数据结构进行转化
+    bool convertAllTapeToPartTape();
+	// 将单条标尺数据的转化
+    void convertSingleTape(const singleTape& st, const std::string& id,
+        std::vector<partTape>& result);
+
 
     // 由椭球参数ell以及大地纬度B计算M、N（子午圈曲率半径以及卯酉圈曲率半径）
 	void calMN(const double& B, const CoordSystem::Ellipsoid::Ellipsoid_para& ell, double& M, double& N);

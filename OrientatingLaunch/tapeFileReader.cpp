@@ -4,6 +4,9 @@
 #include <locale>
 
 
+
+bool tapeFileReader::isDefaultTapeFile = false; // 初始化为true，表示未读入数据
+
 tapeFileReader::tapeFileReader() = default;
 tapeFileReader::tapeFileReader(const std::string& filePath) {
 
@@ -38,7 +41,7 @@ bool tapeFileReader::readTapeFile(const std::string& filePath) {
 
         switch (groupStep) {
         case 0: { // 读取基准点ID
-            currentTape.JZId = line;
+            currentTape.JZorFSId = line;
             groupStep = 1;
             break;
         }

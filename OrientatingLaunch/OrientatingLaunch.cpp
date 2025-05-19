@@ -80,7 +80,9 @@ OrientatingLaunch::OrientatingLaunch(EdgeManager& manager,
     const In2FileReader& reader, tapeFileReader& tapeReader)
     : manager(manager), reader(reader), tapeReader(tapeReader) {
     sigma0 = reader.getAccuracyValues()[0].directionPrecision;
-    std::cout << "存在标尺数据，载入数据" << std::endl;
+    if (!tapeFileReader::isDefaultTapeFile) {
+        std::cout << "存在标尺数据，载入数据" << std::endl;
+	}
 }
 
 
@@ -1121,7 +1123,7 @@ void OrientatingLaunch::convertAzimuths() {
 // 标尺数据处理模块
 bool OrientatingLaunch::processTapeData() {
     distObsAdjustment();
-
+    convertAllTapeToPartTape();
     for (partTape& part : tapeReader.TapeData) {
         if (!processPartTapeValue(part)) {
 			cerr << "处理部分标尺数据失败！" << endl;
@@ -1138,7 +1140,7 @@ bool OrientatingLaunch::processTapeData() {
 }
 
 bool OrientatingLaunch::processPartTapeValue(partTape& part) {
-    string jzdId = part.JZId;
+    string jzdId = part.JZorFSId;
 	string firstMzdId = part.MzdData[0].MzdId;
 	int finMzdIndex = part.MzdData.size() - 1;
 	string finalMzdId = part.MzdData[finMzdIndex].MzdId;
@@ -1345,19 +1347,9 @@ bool OrientatingLaunch::processPartTapeValue(partTape& part) {
     return true;
 }
 
-void OrientatingLaunch::printTapeFwValue() {
-    for (const partTape& part : tapeReader.TapeData) {
-        std::cout << "基准点: " << part.JZId << std::endl;
-        for (const mzdData& mzd : part.MzdData) {
-			std::cout << "瞄准点: " << mzd.MzdId << "\t"
-				<< ", 方位角（度分秒）: " << AngleConverter::formatAngleString(mzd.fwValue) << std::endl;
-        }
-    }
-}
-
 // 标尺平面坐标方位角转换天文方位角
 bool OrientatingLaunch::convertPartTapeValue(partTape& part) {
-    string jzdId = part.JZId;
+    string jzdId = part.JZorFSId;
     for (mzdData& markData : part.MzdData) {
 		string currentMzdId = markData.MzdId;
 		//pair<string, string> edgeKey = std::make_pair(jzdId, currentMzdId);
@@ -1416,20 +1408,20 @@ bool OrientatingLaunch::convertPartTapeValue(partTape& part) {
 
         //大地方位角转换为天文方位角(反向)
         PointAz pointAzReverse;
-        pointAz.pointName = currentMzdId;
-        pointAz.A = coordAzReverse.A; // 大地方位角
-        pointAz.xi = pointsInfo[currentMzdId].BAstro - pointsInfo[currentMzdId].BGeo; // 垂线偏差南北分量
-        pointAz.eta = (pointsInfo[currentMzdId].LAstro - pointsInfo[currentMzdId].LGeo) * cos(pointsInfo[currentMzdId].BAstro * M_PI / 180.0); // 垂线偏差东西分量
-        pointAz.Z = 42.5268; // 天顶距 （用高程计算，高程文件获取）
-        pointAz.L = pointsInfo[currentMzdId].LGeo; // 大地经度 
-        pointAz.lamda = pointsInfo[currentMzdId].LAstro; // 地面天文经度
-        pointAz.fai = pointsInfo[currentMzdId].BAstro;  // 地面天文纬度
-        pointAz.sigmaAlpha = 1; // 方位角精度
+        pointAzReverse.pointName = currentMzdId;
+        pointAzReverse.A = coordAzReverse.A; // 大地方位角
+        pointAzReverse.xi = pointsInfo[currentMzdId].BAstro - pointsInfo[currentMzdId].BGeo; // 垂线偏差南北分量
+        pointAzReverse.eta = (pointsInfo[currentMzdId].LAstro - pointsInfo[currentMzdId].LGeo) * cos(pointsInfo[currentMzdId].BAstro * M_PI / 180.0); // 垂线偏差东西分量
+        pointAzReverse.Z = 42.5268; // 天顶距 （用高程计算，高程文件获取）
+        pointAzReverse.L = pointsInfo[currentMzdId].LGeo; // 大地经度 
+        pointAzReverse.lamda = pointsInfo[currentMzdId].LAstro; // 地面天文经度
+        pointAzReverse.fai = pointsInfo[currentMzdId].BAstro;  // 地面天文纬度
+        pointAzReverse.sigmaAlpha = 1; // 方位角精度
 
-        pointAz.H1 = 10; // 起点正常高（高程文件获取）
-        pointAz.Zeta = 0; // 高程异常 (可以取值为0（忽略不计））
-        pointAz.H2 = 21; // 终点正常高（高程文件获取）
-        pointAz.sigmaH1 = 0.1;
+        pointAzReverse.H1 = 10; // 起点正常高（高程文件获取）
+        pointAzReverse.Zeta = 0; // 高程异常 (可以取值为0（忽略不计））
+        pointAzReverse.H2 = 21; // 终点正常高（高程文件获取）
+        pointAzReverse.sigmaH1 = 0.1;
 
         GeodeticCalculator::caclGeoAngleToAstro(pointAzReverse);
         markData.reverseFwValueAstro = pointAzReverse.alpha_sea;
@@ -1525,6 +1517,51 @@ bool OrientatingLaunch::distObsAdjustment() {
         adjustSingleTape(tape);
     }
 
+    return true;
+}
+
+// 将单条标尺数据的转化
+void OrientatingLaunch::convertSingleTape(const singleTape& st, const std::string& id,
+    std::vector<partTape>& result) {
+    // 确定大刻度索引
+    std::vector<size_t> largeIndices;
+    for (size_t i = 0; i < st.markId.size(); ++i) {
+        if (pointsInfo.find(st.markId[i]) != pointsInfo.end()) {
+            largeIndices.push_back(i);
+        }
+    }
+
+    // 不足两个大刻度无法分割
+    if (largeIndices.size() < 2) return;
+
+    // 分割区间生成partTape
+    for (size_t i = 0; i < largeIndices.size() - 1; ++i) {
+        size_t start = largeIndices[i];
+        size_t end = largeIndices[i + 1];
+
+        partTape pt;
+        pt.JZorFSId = id;
+
+        // 填充中间点数据
+        for (size_t j = start; j <= end; ++j) {
+            mzdData md;
+            md.MzdId = st.markId[j];
+            md.tapeValue = st.markValue[j];
+            pt.MzdData.push_back(md);
+        }
+
+        result.push_back(pt);
+    }
+}
+
+// 将标尺的数据结构进行转化
+bool OrientatingLaunch::convertAllTapeToPartTape() {
+    for (const auto& single : tapeReader.tapeFileData.allTapeData) {
+        // 处理基准点组合
+        convertSingleTape(single, tapeReader.tapeFileData.JZId, tapeReader.TapeData);
+        // 处理发射点组合
+        convertSingleTape(single, tapeReader.tapeFileData.FSId, tapeReader.TapeData);
+    }
 
     return true;
 }
