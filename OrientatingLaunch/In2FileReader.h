@@ -31,7 +31,7 @@ namespace Ui {
     // 存储观测值
     struct Observation {
         std::string pointId;   // 目标点ID
-        std::string type;      // 观测类型（L: 方向观测, S: 距离观测）
+        std::string type;      // 观测类型（L: 方向观测, S: 距离观测，A：方位角观测）
         std::string value;     // 观测值
         std::string accuracyNumber = "1";
     };

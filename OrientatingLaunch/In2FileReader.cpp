@@ -95,7 +95,7 @@ bool In2FileReader::readIn2File(const std::string& filePath) {
                 obs.pointId = trim(parts[0]);
                 if (parts[1] == "L") obs.type = "方向观测";
                 else if (parts[1] == "S") obs.type = "距离观测";
-                else if (parts[1] == "A") obs.type = "方位角";
+                else if (parts[1] == "A") obs.type = "方位角观测";
                 obs.value = trim(parts[2]);
                 obsData.observations.push_back(obs);
             }
